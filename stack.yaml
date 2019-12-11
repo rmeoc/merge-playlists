@@ -31,6 +31,7 @@ resolver: lts-14.16
 packages:
 - rmeoc-merge-playlists-app
 - rmeoc-playlist-tools
+- rmeoc-spotify-client
 - rmeoc-utils
 # Dependency packages to be pulled from upstream that are not in the resolver.
 # These entries can reference officially published versions as well as

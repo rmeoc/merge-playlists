@@ -1,0 +1,29 @@
+name:    rmeoc-spotify-client
+version: "0.0.0"
+
+dependencies:
+- aeson
+- aeson-casing
+- base
+- blaze-builder
+- bytestring
+- conduit
+- lens
+- mtl
+- path-pieces
+- text
+- time
+- unliftio
+- unordered-containers
+- uri-bytestring
+- vector
+- vector-builder
+- wreq
+
+library:
+  source-dirs: src
+  exposed-modules:
+    - SpotifyClient
+    - SpotifyClient.Types
+  ghc-options:
+    - -Wall
