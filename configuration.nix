@@ -1,8 +1,8 @@
 { config, pkgs, ... }:
 
 let
-  stateDir = "/var/my-web-app";
-  myWebAppConfigFile = pkgs.writeText "my-web-app-config" ''
+  stateDir = "/var/rmeoc-merge-playlists-app";
+  myWebAppConfigFile = pkgs.writeText "rmeoc-merge-playlists-app-config" ''
     client-session-key-path: "/run/keys/client-session"
     generated-dir: "${stateDir}"
     auth0:
@@ -48,19 +48,19 @@ in
       host  all all      ::1/128 md5
     '';
     initialScript = pkgs.writeText "backend-initScript" ''
-      CREATE USER "my-web-app" WITH PASSWORD 'my-web-app';
-      CREATE DATABASE "my-web-app" WITH OWNER "my-web-app";
+      CREATE USER "rmeoc-merge-playlists-app" WITH PASSWORD 'rmeoc-merge-playlists-app';
+      CREATE DATABASE "rmeoc-merge-playlists-app" WITH OWNER "rmeoc-merge-playlists-app";
     '';
   };
 
-  systemd.services.my-web-app =
-  { description = "my-web-app";
+  systemd.services.rmeoc-merge-playlists-app =
+  { description = "rmeoc-merge-playlists-app";
     wants = [ "postgresql.service" "client-session-key.service" "auth0-client-secret-key.service" ];
     after = [ "postgresql.service" "client-session-key.service" "auth0-client-secret-key.service" ];
     wantedBy = [ "multi-user.target" ];
     script = ''
       export YESOD_AUTH0_CLIENT_SECRET=$(cat /run/keys/auth0-client-secret)
-      ${pkgs.haskellPackages.my-web-app}/bin/my-web-app-launcher ${myWebAppConfigFile}
+      ${pkgs.haskellPackages.rmeoc-merge-playlists-app}/bin/rmeoc-merge-playlists-app-launcher ${myWebAppConfigFile}
     '';
     serviceConfig =
       { User = "mywebsrv";

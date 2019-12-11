@@ -5,18 +5,18 @@
   let
     staticDir = builtins.path {
       path = ./static;
-      name = "my-web-app-static";
+      name = "rmeoc-merge-playlists-app-static";
     };
-    configFile = pkgs.writeText "my-web-app-config" ''
+    configFile = pkgs.writeText "rmeoc-merge-playlists-app-config" ''
       static-dir: "${staticDir}"
     '';
     myWebApp = haskell.lib.overrideCabal
-      (callCabal2nix "my-web-app" ./. { })
+      (callCabal2nix "rmeoc-merge-playlists-app" ./. { })
       (drv: {
         doCheck = false;
         doHaddock = false;
       });
   in
-    pkgs.writeShellScriptBin "my-web-app-launcher" ''
-      exec ${myWebApp}/bin/my-web-app $@ ${configFile}
+    pkgs.writeShellScriptBin "rmeoc-merge-playlists-app-launcher" ''
+      exec ${myWebApp}/bin/rmeoc-merge-playlists-app $@ ${configFile}
     ''

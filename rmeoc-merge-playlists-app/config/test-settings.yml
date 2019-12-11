@@ -5,7 +5,7 @@ database:
   # would like to have environment variable overrides, you could instead use
   # something like:
   #
-  #   database: "_env:PGDATABASE:my-web-app_test"
-  database: my-web-app_test
+  #   database: "_env:PGDATABASE:rmeoc-merge-playlists-app_test"
+  database: rmeoc-merge-playlists-app_test
 
 auth-dummy-login: true

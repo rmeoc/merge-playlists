@@ -3,10 +3,10 @@
 After installing Postgres, run:
 
 ```
-createuser my-web-app --pwprompt --superuser
-# Enter password my-web-app when prompted
-createdb my-web-app
-createdb my-web-app_test
+createuser rmeoc-merge-playlists-app --pwprompt --superuser
+# Enter password rmeoc-merge-playlists-app when prompted
+createdb rmeoc-merge-playlists-app
+createdb rmeoc-merge-playlists-app_test
 ```
 
 ## Haskell Setup
@@ -31,7 +31,7 @@ As your code changes, your site will be automatically recompiled and redeployed 
 ## Tests
 
 ```
-stack test --flag my-web-app:library-only --flag my-web-app:dev
+stack test --flag rmeoc-merge-playlists-app:library-only --flag rmeoc-merge-playlists-app:dev
 ```
 
 (Because `yesod devel` passes the `library-only` and `dev` flags, matching those flags means you don't need to recompile between tests and development, and it disables optimization to speed up your test compile times).

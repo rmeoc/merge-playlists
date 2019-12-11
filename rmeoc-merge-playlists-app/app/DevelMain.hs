@@ -6,7 +6,7 @@
 --
 -- 1. Start up GHCi
 --
--- $ stack ghci my-web-app:lib --no-load --work-dir .stack-work-devel
+-- $ stack ghci rmeoc-merge-playlists-app:lib --no-load --work-dir .stack-work-devel
 --
 -- 2. Load this module
 --

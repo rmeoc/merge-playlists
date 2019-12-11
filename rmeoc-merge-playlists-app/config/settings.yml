@@ -32,12 +32,12 @@ ip-from-header: "_env:YESOD_IP_FROM_HEADER:false"
 # See https://github.com/yesodweb/yesod/wiki/Configuration#parsing-numeric-values-as-strings
 
 database:
-  user:     "_env:YESOD_PGUSER:my-web-app"
-  password: "_env:YESOD_PGPASS:my-web-app"
+  user:     "_env:YESOD_PGUSER:rmeoc-merge-playlists-app"
+  password: "_env:YESOD_PGPASS:rmeoc-merge-playlists-app"
   host:     "_env:YESOD_PGHOST:localhost"
   port:     "_env:YESOD_PGPORT:5432"
   # See config/test-settings.yml for an override during tests
-  database: "_env:YESOD_PGDATABASE:my-web-app"
+  database: "_env:YESOD_PGDATABASE:rmeoc-merge-playlists-app"
   poolsize: "_env:YESOD_PGPOOLSIZE:10"
 
 auth0:

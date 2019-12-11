@@ -1,5 +1,5 @@
 {-# LANGUAGE PackageImports #-}
-import "my-web-app" Application (develMain)
+import "rmeoc-merge-playlists-app" Application (develMain)
 import Prelude (IO)
 
 main :: IO ()

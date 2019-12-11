@@ -1,4 +1,4 @@
-name:    my-web-app
+name:    rmeoc-merge-playlists-app
 version: "0.0.0"
 
 dependencies:
@@ -70,7 +70,7 @@ library:
 
 # Runnable executable for our application
 executables:
-  my-web-app:
+  rmeoc-merge-playlists-app:
     main: main.hs
     source-dirs: app
     ghc-options:
@@ -78,7 +78,7 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - my-web-app
+    - rmeoc-merge-playlists-app
     when:
     - condition: flag(library-only)
       buildable: false
@@ -91,12 +91,12 @@ executables:
 
 # Test suite
 tests:
-  my-web-app-test:
+  rmeoc-merge-playlists-app-test:
     main: Spec.hs
     source-dirs: test
     ghc-options: -Wall
     dependencies:
-    - my-web-app
+    - rmeoc-merge-playlists-app
     - hspec >=2.0.0
     - yesod-test
 
