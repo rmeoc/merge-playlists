@@ -1,0 +1,17 @@
+name:    rmeoc-playlist-tools
+version: "0.0.0"
+
+dependencies:
+- base
+- conduit
+- mono-traversable
+- rmeoc-utils
+- vector
+- vector-builder
+
+library:
+  source-dirs: src
+  exposed-modules:
+    - PlaylistTools
+  ghc-options:
+    - -Wall

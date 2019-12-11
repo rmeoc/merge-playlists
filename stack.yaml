@@ -30,6 +30,7 @@ resolver: lts-14.16
 #   - wai
 packages:
 - rmeoc-merge-playlists-app
+- rmeoc-playlist-tools
 - rmeoc-utils
 # Dependency packages to be pulled from upstream that are not in the resolver.
 # These entries can reference officially published versions as well as
