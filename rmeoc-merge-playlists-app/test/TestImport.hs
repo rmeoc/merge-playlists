@@ -82,6 +82,5 @@ createUser :: Text -> YesodExample App (Entity User)
 createUser ident = runDB $ do
     user <- insertEntity User
         { userIdent = ident
-        , userPassword = Nothing
         }
     return user
