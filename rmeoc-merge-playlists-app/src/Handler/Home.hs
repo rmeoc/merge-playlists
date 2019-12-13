@@ -25,9 +25,3 @@ getHomeR = do
     defaultLayout $ do
         setTitle "Welcome To Yesod!"
         $(widgetFile "homepage")
-
-postHomeR :: Handler Html
-postHomeR = do
-    defaultLayout $ do
-        setTitle "Welcome To Yesod!"
-        $(widgetFile "homepage")
