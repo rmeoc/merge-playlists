@@ -25,7 +25,6 @@ getHomeR = do
     let handlerName = "getHomeR" :: Text
 
     defaultLayout $ do
-        aDomId <- newIdent
         setTitle "Welcome To Yesod!"
         $(widgetFile "homepage")
 
@@ -34,6 +33,5 @@ postHomeR = do
     let handlerName = "postHomeR" :: Text
 
     defaultLayout $ do
-        aDomId <- newIdent
         setTitle "Welcome To Yesod!"
         $(widgetFile "homepage")
