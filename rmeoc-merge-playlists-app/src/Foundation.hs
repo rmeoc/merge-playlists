@@ -269,12 +269,11 @@ instance YesodAuth App where
     -- You can add other plugins like Google Email, email or OAuth here
     authPlugins :: App -> [AuthPlugin App]
     authPlugins app =
-        [ authOpenId Claimed []
-        , auth0Plugin $ appAuth0Settings $ appSettings app
-        ] ++ extraAuthPlugins
-      where
-        -- Enable authDummy login if enabled.
-        extraAuthPlugins = [authDummy | appAuthDummyLogin $ appSettings app]
+        catMaybes
+            [ Just $ authOpenId Claimed []
+            , Just $ auth0Plugin $ appAuth0Settings $ appSettings app
+            , if appAuthDummyLogin $ appSettings app then Just authDummy else Nothing
+            ]
 
 -- | Access function to determine if a user is logged in.
 isAuthenticated :: Handler AuthResult
