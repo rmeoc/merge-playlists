@@ -19,7 +19,6 @@ import Control.Monad.Logger (LogSource)
 -- Used only when in "auth-dummy-login" setting is enabled.
 import Yesod.Auth.Dummy
 
-import Yesod.Auth.OpenId    (authOpenId, IdentifierType (Claimed))
 import Yesod.Default.Util   (addStaticContentExternal)
 import Yesod.Core.Types     (Logger)
 import qualified Yesod.Core.Unsafe as Unsafe
@@ -270,8 +269,7 @@ instance YesodAuth App where
     authPlugins :: App -> [AuthPlugin App]
     authPlugins app =
         catMaybes
-            [ Just $ authOpenId Claimed []
-            , Just $ auth0Plugin $ appAuth0Settings $ appSettings app
+            [ Just $ auth0Plugin $ appAuth0Settings $ appSettings app
             , if appAuthDummyLogin $ appSettings app then Just authDummy else Nothing
             ]
 
