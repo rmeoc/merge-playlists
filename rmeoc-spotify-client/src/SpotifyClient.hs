@@ -31,8 +31,9 @@ import Control.Lens                 ((&), (.~), (?~), (^.))
 import Control.Monad                (when)
 import Control.Monad.IO.Class       (MonadIO, liftIO)
 import Control.Monad.Reader         (MonadReader, ask)
-import Data.Aeson                   ((.:))
+import Data.Aeson                   (FromJSON, (.:))
 import Data.ByteString.Builder      (intDec)
+import Data.ByteString.Lazy         (ByteString)
 import Data.Conduit.Combinators     (mapM_E, vectorBuilder)
 import Data.List.NonEmpty           (NonEmpty(..))
 import Data.Monoid                  (Sum(..))
@@ -54,6 +55,7 @@ import qualified Data.List.NonEmpty as NE
 import qualified Data.Vector as V
 import qualified Network.Wreq as W
 import qualified Network.Wreq.Session as WS
+import qualified Network.Wreq.Types as WT
 import qualified SpotifyClient.Types as S
 import qualified VectorBuilder.Builder as VB
 import qualified VectorBuilder.Vector as VB
@@ -68,22 +70,32 @@ data CreatePlaylistResult = CreatePlaylistResult
     , cprName :: Text
     }
 
+supplyWreqOptionsAndSession :: (MonadReader S.SpotifyClientContext m) => (W.Options -> WS.Session -> m a) -> m a
+supplyWreqOptionsAndSession f = do
+    S.SpotifyClientContext { S.sccAccessToken, S.sccWreqSession } <- ask
+    let wreqOptions = W.defaults & W.auth ?~ W.oauth2Bearer (encodeUtf8 sccAccessToken)
+    f wreqOptions sccWreqSession
+
+get' :: (MonadIO m, MonadReader S.SpotifyClientContext m) => String -> m (W.Response ByteString) 
+get' url = supplyWreqOptionsAndSession $ \options session -> liftIO $ WS.getWith options session url
+
+post' :: (MonadIO m, MonadReader S.SpotifyClientContext m, WT.Postable a) => String -> a -> m (W.Response ByteString) 
+post' url payload = supplyWreqOptionsAndSession $ \options session -> liftIO $ WS.postWith options session url payload
+
+asJSON' :: (MonadIO m, FromJSON a) => W.Response ByteString -> m (W.Response a) 
+asJSON' = liftIO . W.asJSON
+
 getListOfPlaylists :: (MonadIO m, MonadReader S.SpotifyClientContext m) => Integer -> Integer -> m (S.Paging S.PlaylistSimplified)
 getListOfPlaylists offset limit = do
 
-    S.SpotifyClientContext { S.sccAccessToken, S.sccWreqSession } <- ask
-
-    let wreqOptions = W.defaults & W.auth ?~ W.oauth2Bearer (encodeUtf8 sccAccessToken)
-
     playlistsResp <-
-        liftIO $
-            W.asJSON =<< (WS.getWith wreqOptions sccWreqSession $ 
-                BS8.unpack $ serializeURIRef' $
-                    [uri|https://api.spotify.com/v1/me/playlists|]
-                        & queryL .queryPairsL .~ 
-                            [ ("offset", BS8.pack $ show offset)
-                            , ("limit", BS8.pack $ show limit)
-                            ])
+        asJSON' =<< get'
+            (BS8.unpack $ serializeURIRef' $
+                [uri|https://api.spotify.com/v1/me/playlists|]
+                    & queryL .queryPairsL .~ 
+                        [ ("offset", BS8.pack $ show offset)
+                        , ("limit", BS8.pack $ show limit)
+                        ])
 
     return $ playlistsResp ^. responseBody    
 
@@ -145,10 +157,8 @@ playlistTracksSource playlistId = do
 
         requestTracks :: (MonadIO m, MonadReader S.SpotifyClientContext m) => NonEmpty BL.Builder -> Int -> m J.Object
         requestTracks fields offset = do
-            S.SpotifyClientContext { S.sccAccessToken, S.sccWreqSession } <- ask
             let url = getTracksUri fields offset
-            let wreqOptions = W.defaults & W.auth ?~ W.oauth2Bearer (encodeUtf8 sccAccessToken)
-            resp <- liftIO (W.asJSON =<< (WS.getWith wreqOptions sccWreqSession $ BS8.unpack $ serializeURIRef' url))
+            resp <- asJSON' =<< get' (BS8.unpack $ serializeURIRef' url)
             return $ resp ^. responseBody
         
         getTracksFromResponse :: (MonadIO m) => J.Object -> m (Vector Text)
@@ -171,26 +181,19 @@ playlistTracksSink playlistId =
         sendPostRequestsSink :: (MonadIO m, MonadReader S.SpotifyClientContext m) => ConduitT (Vector Text) Void m ()
         sendPostRequestsSink =
             awaitForever $ \tracks -> do
-                S.SpotifyClientContext { S.sccAccessToken, S.sccWreqSession } <- ask
-                let wreqOptions = W.defaults & W.auth ?~ W.oauth2Bearer (encodeUtf8 sccAccessToken)
-                liftIO $
-                    WS.postWith wreqOptions sccWreqSession
-                        (BS8.unpack $ serializeURIRef' $ [uri|https://api.spotify.com/|]
-                            & pathL .~ (encodeUtf8 $ "/v1/playlists/" <> S.unPlaylistId playlistId <> "/tracks"))
-                        (J.object
-                            [ ( "uris", J.Array $ fmap J.String tracks)
-                            ])
+                post'
+                    (BS8.unpack $ serializeURIRef' $ [uri|https://api.spotify.com/|]
+                        & pathL .~ (encodeUtf8 $ "/v1/playlists/" <> S.unPlaylistId playlistId <> "/tracks"))
+                    (J.object
+                        [ ( "uris", J.Array $ fmap J.String tracks)
+                        ])
 
 createPlaylist :: (MonadIO m, MonadReader S.SpotifyClientContext m) => Text -> m CreatePlaylistResult
 createPlaylist name = do
 
-    S.SpotifyClientContext { S.sccAccessToken, S.sccWreqSession } <- ask
-
-    let wreqOptions = W.defaults & W.auth ?~ W.oauth2Bearer (encodeUtf8 sccAccessToken)
-
-    resp <- liftIO $
-        W.asJSON =<< (WS.postWith wreqOptions sccWreqSession "https://api.spotify.com/v1/me/playlists"
-            $ J.object
+    resp <-
+        asJSON' =<< post' "https://api.spotify.com/v1/me/playlists"
+            (J.object
                 [ ( "name", J.String name )
                 , ( "public", J.Bool False )
                 ])
