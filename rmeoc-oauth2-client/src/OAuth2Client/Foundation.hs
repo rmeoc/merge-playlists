@@ -46,7 +46,7 @@ data OAuth2ClientConf = OAuth2ClientConf
     { occAuthorizeUrl :: Url
     , occClientId :: Text
     , occClientSecret :: Text
-    , occTokenUrl :: String
+    , occTokenUrl :: Url
     , occScopes :: [Text]
     } deriving (Generic)
 

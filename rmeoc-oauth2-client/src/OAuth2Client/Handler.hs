@@ -29,7 +29,8 @@ import Data.Typeable                (Typeable)
 import GHC.Generics                 (Generic)
 import Network.HTTP.Client          (HttpException(..), HttpExceptionContent(..))
 import Network.Wreq                 (FormParam(..), responseBody)
-import OAuth2Client.Foundation      (OAuth2ClientConf(..), OAuth2ClientSubsite(..), Route(..), SessionKey(..), resourcesOAuth2ClientSubsite)
+import OAuth2Client.Foundation      (OAuth2ClientConf(..), OAuth2ClientSubsite(..), Route(..), SessionKey(..), Url,
+                                    resourcesOAuth2ClientSubsite)
 import UnliftIO                     (MonadUnliftIO)
 import UnliftIO.Exception           (Exception, throwIO, try, tryJust)
 import URI.ByteString               (queryL, queryPairsL, serializeURIRef')
@@ -49,6 +50,9 @@ data AuthorizationException = AuthorizationException deriving (Show, Typeable)
 
 instance Exception AuthorizationException
   
+urlToString :: Url -> String
+urlToString = T.unpack . decodeUtf8 . serializeURIRef' . N.unpack 
+
 withAccessToken :: (MonadHandler m, MonadUnliftIO m, MonadReader WS.Session m) => OAuth2ClientSubsite -> (Route OAuth2ClientSubsite -> Route (HandlerSite m)) -> (Text -> m a) -> m a
 withAccessToken sy toParent action = do
     redirectToAuthorizeOnFail sy toParent $ withAccessToken_ sy action
@@ -122,7 +126,7 @@ refreshTokenAndRetryOnFail sy action = do
                                     W.asJSON =<< WS.postWith
                                         (W.defaults & W.auth ?~ W.basicAuth clientId clientSecret)
                                         wreqSession
-                                        tokenUrl
+                                        (urlToString tokenUrl)
                                         [ "grant_type" := ("refresh_token" :: Text)
                                         , "refresh_token" := refreshToken
                                         ]
@@ -219,7 +223,7 @@ getCallbackR = do
                 W.asJSON =<< WS.postWith
                     (W.defaults & W.auth ?~ W.basicAuth clientId clientSecret)
                     wreqSession
-                    tokenUrl
+                    (urlToString tokenUrl)
                     [ "grant_type" := ("authorization_code" :: Text)
                     , "code" := code
                     , "redirect_uri" := redirectUri
