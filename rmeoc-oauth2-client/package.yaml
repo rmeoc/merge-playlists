@@ -1,4 +1,4 @@
-name:    oauth2-client
+name:    rmeoc-oauth2-client
 version: "0.0.0"
 
 dependencies:
