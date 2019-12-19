@@ -1,0 +1,26 @@
+name:    oauth2-client
+version: "0.0.0"
+
+dependencies:
+- aeson
+- aeson-casing
+- base
+- either
+- http-client
+- lens
+- mtl
+- newtype
+- nonce
+- semigroupoids
+- text
+- unliftio
+- uri-bytestring
+- wreq
+- yesod-core
+
+library:
+  source-dirs: src
+  exposed-modules:
+    - OAuth2Client
+  ghc-options:
+    - -Wall
