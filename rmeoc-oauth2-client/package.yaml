@@ -5,8 +5,11 @@ dependencies:
 - aeson
 - aeson-casing
 - base
+- bytestring
 - either
+- hoauth2
 - http-client
+- http-types
 - lens
 - mtl
 - newtype
@@ -15,7 +18,6 @@ dependencies:
 - text
 - unliftio
 - uri-bytestring
-- wreq
 - yesod-core
 
 library:

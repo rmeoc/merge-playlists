@@ -24,6 +24,7 @@ import Data.Either              (either)
 import Data.Text                (Text)
 import Data.Text.Encoding       (encodeUtf8)
 import GHC.Generics             (Generic)
+import Network.HTTP.Client      (Manager)
 import URI.ByteString           (Absolute, URIRef, parseURI, strictURIParserOptions)
 import Yesod.Core               (Yesod, Route, mkYesodSubData, parseRoutesFile, renderRoute)
 
@@ -63,16 +64,22 @@ data OAuth2ClientSubsite = OAuth2ClientSubsite
     { ocsSessionKey :: SessionKey -> Text
     , ocsConfig :: OAuth2ClientConf
     , ocsNonceGenerator :: N.Generator
+    , ocsHttpManager :: Manager
     }
 
 mkYesodSubData "OAuth2ClientSubsite" $(parseRoutesFile "routes")
 
 instance Yesod OAuth2ClientSubsite
 
-initOAuth2ClientSubsite :: MonadIO m => (SessionKey -> Text) -> OAuth2ClientConf -> m OAuth2ClientSubsite
-initOAuth2ClientSubsite translateSessionKey conf = do
+initOAuth2ClientSubsite :: MonadIO m => (SessionKey -> Text) -> OAuth2ClientConf -> Manager -> m OAuth2ClientSubsite
+initOAuth2ClientSubsite translateSessionKey conf manager = do
     nonceGen <- N.new
-    return $ OAuth2ClientSubsite translateSessionKey conf nonceGen
+    return OAuth2ClientSubsite
+        { ocsSessionKey = translateSessionKey
+        , ocsConfig = conf
+        , ocsNonceGenerator = nonceGen
+        , ocsHttpManager = manager
+        }
 
 deleteOAuth2ClientSubsite :: MonadIO m => OAuth2ClientSubsite -> m ()
 deleteOAuth2ClientSubsite subsite = N.delete $ ocsNonceGenerator subsite
