@@ -9,6 +9,7 @@
 /favicon.ico FaviconR GET
 /robots.txt RobotsR GET
 
-/ HomeR GET
+/           HomeR       GET
+/playlists  PlaylistsR  GET
 
 /profile ProfileR GET

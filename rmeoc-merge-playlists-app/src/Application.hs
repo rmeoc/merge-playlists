@@ -47,6 +47,7 @@ import qualified OAuth2Client as OA
 import Handler.Common
 import Handler.Home
 import Handler.Profile
+import Handler.Playlists
 
 data SessionKey = SessionKeySpotifyClient OA.SessionKey
 

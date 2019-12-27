@@ -132,6 +132,11 @@ instance Yesod App where
                     , menuItemRoute = ProfileR
                     , menuItemAccessCallback = isJust muser
                     }
+                , NavbarLeft $ MenuItem
+                    { menuItemLabel = "Playlists"
+                    , menuItemRoute = PlaylistsR
+                    , menuItemAccessCallback = isJust muser
+                    }
                 , NavbarRight $ MenuItem
                     { menuItemLabel = "Login"
                     , menuItemRoute = AuthR LoginR
@@ -182,6 +187,7 @@ instance Yesod App where
     -- These routes require that the user is authenticated, so we
     -- delegate to that function
     isAuthorized ProfileR _ = isAuthenticated
+    isAuthorized PlaylistsR _ = isAuthenticated
     isAuthorized (SpotifyClientR _) _ = isAuthenticated
 
     -- This function creates static content files in the static folder
