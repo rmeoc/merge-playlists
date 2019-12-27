@@ -19,6 +19,7 @@ import           Data.Yaml                   (decodeEither')
 import           Database.Persist.Postgresql (PostgresConf)
 import           Language.Haskell.TH.Syntax  (Exp, Name, Q)
 import           Network.Wai.Handler.Warp    (HostPreference)
+import           OAuth2Client                (OAuth2ClientConf)
 import           Yesod.Default.Config2       (applyEnvValue, configSettingsYml)
 import           Yesod.Default.Util          (WidgetFileSettings,
                                               widgetFileNoReload,
@@ -69,6 +70,8 @@ data AppSettings = AppSettings
 
     , appAuthDummyLogin         :: Bool
     -- ^ Indicate if auth dummy login should be enabled.
+
+    , appSpotifyClientConf      :: OAuth2ClientConf
     }
 
 instance FromJSON AppSettings where
@@ -83,7 +86,7 @@ instance FromJSON AppSettings where
         appStaticDir              <- o .: "static-dir"
         appGeneratedDir           <- o .: "generated-dir"
         appDatabaseConf           <- o .: "database"
-        appAuth0Settings         <- o .: "auth0"
+        appAuth0Settings          <- o .: "auth0"
         appRoot                   <- o .:? "approot"
         appHost                   <- fromString <$> o .: "host"
         appPort                   <- o .: "port"
@@ -101,6 +104,8 @@ instance FromJSON AppSettings where
         appAnalytics              <- o .:? "analytics"
 
         appAuthDummyLogin         <- o .:? "auth-dummy-login"      .!= dev
+        
+        appSpotifyClientConf      <- o .: "spotify-client"
 
         return AppSettings {..}
 

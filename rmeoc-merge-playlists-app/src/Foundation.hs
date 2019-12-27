@@ -12,6 +12,7 @@ module Foundation where
 
 import Import.NoFoundation
 import Database.Persist.Sql (ConnectionPool, runSqlPool)
+import OAuth2Client         (OAuth2ClientSubsite)
 import Text.Hamlet          (hamletFile)
 import Text.Jasmine         (minifym)
 import Control.Monad.Logger (LogSource)
@@ -41,6 +42,7 @@ data App = App
     , appConnPool    :: ConnectionPool -- ^ Database connection pool.
     , appHttpManager :: Manager
     , appLogger      :: Logger
+    , appSpotifyClientSubsite :: OAuth2ClientSubsite
     }
 
 data MenuItem = MenuItem
@@ -177,9 +179,10 @@ instance Yesod App where
     isAuthorized (StaticR _) _ = return Authorized
     isAuthorized (GeneratedR _) _ = return Authorized
 
-    -- the profile route requires that the user is authenticated, so we
+    -- These routes require that the user is authenticated, so we
     -- delegate to that function
     isAuthorized ProfileR _ = isAuthenticated
+    isAuthorized (SpotifyClientR _) _ = isAuthenticated
 
     -- This function creates static content files in the static folder
     -- and names them based on a hash of their content. This allows

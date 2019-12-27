@@ -35,14 +35,27 @@ import Network.Wai.Middleware.RequestLogger (Destination (Logger),
                                              IPAddrSource (..),
                                              OutputFormat (..), destination,
                                              mkRequestLogger, outputFormat)
+import OAuth2Client                         (initOAuth2ClientSubsite)
 import System.Log.FastLogger                (defaultBufSize, newStdoutLoggerSet,
                                              toLogStr)
+
+import qualified OAuth2Client as OA
+
 
 -- Import all relevant handler modules here.
 -- Don't forget to add new modules to your cabal file!
 import Handler.Common
 import Handler.Home
 import Handler.Profile
+
+data SessionKey = SessionKeySpotifyClient OA.SessionKey
+
+translateSessionKey :: SessionKey -> Text
+translateSessionKey (SessionKeySpotifyClient key) = case key of
+    OA.SessionKeyAccessToken -> "spfyAccToken"
+    OA.SessionKeyRefreshToken -> "spfyRfrToken"
+    OA.SessionKeyState -> "spfyState"
+    OA.SessionKeyRetryingWithNewAccessToken -> "spfyRetryNewAccToken"
 
 -- This line actually creates our YesodDispatch instance. It is the second half
 -- of the call to mkYesodData which occurs in Foundation.hs. Please see the
@@ -63,6 +76,13 @@ makeFoundation appSettings = do
         (if appMutableStatic appSettings then staticDevel else static)
         (appStaticDir appSettings)
     appGenerated <- static (appGeneratedDir appSettings)
+
+    -- initOAuth2ClientSubsite :: MonadIO m => (SessionKey -> Text) -> OAuth2ClientConf -> Manager -> m OAuth2ClientSubsite
+    appSpotifyClientSubsite <-
+        initOAuth2ClientSubsite
+            (translateSessionKey . SessionKeySpotifyClient)
+            (appSpotifyClientConf appSettings)
+            appHttpManager
 
     -- We need a log function to create a connection pool. We need a connection
     -- pool to create our foundation. And we need our foundation to get a

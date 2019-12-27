@@ -47,6 +47,7 @@ dependencies:
 - jose
 - lens
 - mtl
+- rmeoc-oauth2-client
 - uri-bytestring
 - yesod-auth-oauth2
 

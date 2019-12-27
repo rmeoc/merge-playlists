@@ -1,9 +1,10 @@
 -- By default this file is used by `parseRoutesFile` in Foundation.hs
 -- Syntax for this file here: https://www.yesodweb.com/book/routing-and-handlers
 
-/static    StaticR    Static appStatic
-/generated GeneratedR Static appGenerated
-/auth      AuthR      Auth   getAuth
+/static         StaticR         Static                  appStatic
+/generated      GeneratedR      Static                  appGenerated
+/auth           AuthR           Auth                    getAuth
+/spotify-client SpotifyClientR  OAuth2ClientSubsite     appSpotifyClientSubsite
 
 /favicon.ico FaviconR GET
 /robots.txt RobotsR GET

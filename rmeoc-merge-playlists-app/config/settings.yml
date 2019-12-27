@@ -48,3 +48,12 @@ auth0:
 
 copyright: Insert copyright statement here
 #analytics: UA-YOURCODE
+
+spotify-client:
+  authorize-url: "https://accounts.spotify.com/authorize"
+  client-id:     "_env:MERGE_PLAYLISTS_SPOTIFY_CLIENT_ID:..."
+  client-secret: "_env:MERGE_PLAYLISTS_SPOTIFY_CLIENT_SECRET:..."
+  token-url:     "https://accounts.spotify.com/api/token"
+  scopes:
+    - "playlist-read-private"
+    - "playlist-modify-private"
