@@ -17,7 +17,8 @@ import Crypto.JWT                   (Alg(..), ClaimsSet, HasAlgorithms(..), HasA
                                      StringOrURI, ValidationPolicy(..), algorithms, claimSub, decodeCompact,
                                      defaultJWTValidationSettings, fromOctets, stringOrUri, validationPolicy,
                                      verifyClaims)
-import Data.Aeson                   (withObject)
+import Data.Aeson                   ((.:?), (.!=), withObject)
+import Data.Time.Clock              (NominalDiffTime)
 import Network.OAuth.OAuth2         (idtoken)
 import URI.ByteString               (Absolute, URIRef, authorityL,  authorityHostL, hostBSL, serializeURIRef')
 import URI.ByteString.QQ            (uri)
@@ -31,6 +32,7 @@ data Auth0Settings = Auth0Settings
     { auth0ClientId     :: StringOrURI
     , auth0ClientSecret :: Text
     , auth0Domain       :: Text
+    , auth0AllowedSkew  :: NominalDiffTime
     }
 
 instance FromJSON Auth0Settings where
@@ -38,6 +40,7 @@ instance FromJSON Auth0Settings where
         auth0ClientId             <- o .: "client-id"
         auth0ClientSecret         <- o .: "client-secret"
         auth0Domain               <- o .: "domain"
+        auth0AllowedSkew          <- o .:? "allowed-skew" .!= 0
         return $ Auth0Settings {..}
     
 pluginName :: Text
@@ -66,7 +69,7 @@ auth0Plugin Auth0Settings {..}
         defaultJWTValidationSettings (== auth0ClientId)
             & algorithms .~ singleton HS256
             & validationPolicy .~ AllValidated
-            & allowedSkew .~ 0
+            & allowedSkew .~ auth0AllowedSkew
             & checkIssuedAt .~ True
             & issuerPredicate .~ (== requiredIssuer) . encodeUtf8 . review stringOrUri
       where

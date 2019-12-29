@@ -44,6 +44,7 @@ auth0:
   client-id:     "_env:YESOD_AUTH0_CLIENT_ID:..."
   client-secret: "_env:YESOD_AUTH0_CLIENT_SECRET:..."
   domain:        "_env:YESOD_AUTH0_DOMAIN:example.com"
+  allowed-skew:  2
 
 copyright: Insert copyright statement here
 #analytics: UA-YOURCODE
