@@ -54,7 +54,7 @@ data SessionKey = SessionKeySpotifyClient OA.SessionKey
 
 translateSessionKey :: SessionKey -> Text
 translateSessionKey (SessionKeySpotifyClient key) = case key of
-    OA.SessionKeyAccessToken -> "spfyAccToken"
+    OA.SessionKeyAccessTokenInfo -> "spfyAccToken"
     OA.SessionKeyRefreshToken -> "spfyRfrToken"
     OA.SessionKeyState -> "spfyState"
 

@@ -57,3 +57,5 @@ spotify-client:
   scopes:
     - "playlist-read-private"
     - "playlist-modify-private"
+  token-expires-in-default: 3600
+  refresh-token-when-expires-in: 300

@@ -12,30 +12,32 @@
 {-# LANGUAGE TypeFamilies              #-}
 {-# OPTIONS_GHC -fno-warn-orphans      #-}
 
-module OAuth2Client.Handler (handleCallback, redirectToAuthorizationPage, withAccessToken) where
+module OAuth2Client.Handler (getAccessToken, handleCallback, redirectToAuthorizationPage) where
 
 import Control.Lens                 ((&), (.~))
-import Control.Monad                (when)
+import Control.Monad                (liftM3, when)
 import Control.Monad.Except         (throwError)
 import Crypto.Nonce                 (nonce128url)
 import Data.ByteString              (ByteString)
 import Data.Either.Validation       (Validation(..), eitherToValidation, validationToEither)
 import Data.Functor.Alt             ((<!>))
+import Data.Maybe                   (fromMaybe)
 import Data.Text                    (Text)
 import Data.Text.Encoding           (decodeUtf8, encodeUtf8)
+import Data.Time.Clock.POSIX        (getPOSIXTime)
 import Data.Typeable                (Typeable)
-import Network.HTTP.Client          (HttpException(..), HttpExceptionContent(..), responseStatus)
-import Network.HTTP.Types.Status    (statusCode)
-import Network.OAuth.OAuth2         (ExchangeToken(..), OAuth2(..), OAuth2Token(..), RefreshToken(..),
+import Network.OAuth.OAuth2         (AccessToken(..), ExchangeToken(..), OAuth2(..), OAuth2Token(..), RefreshToken(..),
                                      atoken, authorizationUrl, fetchAccessToken, refreshAccessToken, rtoken)
 import OAuth2Client.Context         (OAuth2ClientConf(..), OAuth2ClientContext(..), SessionKey(..), Url(..))
-import UnliftIO                     (MonadUnliftIO)
-import UnliftIO.Exception           (Exception, throwIO, throwString, try, tryJust)
+import UnliftIO                     (MonadIO, MonadUnliftIO)
+import UnliftIO.Exception           (Exception, throwIO, throwString)
 import URI.ByteString               (parseURI, queryL, queryPairsL, serializeURIRef', strictURIParserOptions)
 import Yesod.Core                   (HandlerSite, MonadHandler, Route, deleteSession, getUrlRender, liftIO,
-                                     logError, lookupGetParam, lookupSession, permissionDenied, redirect,
-                                     setSession)
+                                     logError, lookupGetParam, lookupSession, lookupSessionBS, permissionDenied,
+                                     redirect, setSession, setSessionBS)
 
+import qualified Data.ByteString.Lazy as BSL
+import qualified Data.Binary as B
 import qualified Control.Newtype as N
 import qualified Data.Text as T
 
@@ -43,6 +45,15 @@ import qualified Data.Text as T
 data AuthorizationException = AuthorizationException deriving (Show, Typeable)
 
 instance Exception AuthorizationException
+
+
+data AccessTokenInfo = AccessTokenInfo { tokAccessToken :: AccessToken, tokReceivedAtSeconds :: Int, tokExpiresInSeconds :: Maybe Int }
+
+instance B.Binary AccessTokenInfo where
+    put AccessTokenInfo { tokAccessToken, tokReceivedAtSeconds, tokExpiresInSeconds }
+        = B.put (atoken tokAccessToken) <> B.put tokReceivedAtSeconds <> B.put tokExpiresInSeconds
+    get = liftM3 AccessTokenInfo (AccessToken <$> B.get) B.get B.get
+
 
 oauth2Settings :: OAuth2ClientConf -> Maybe Url -> ByteString -> OAuth2
 oauth2Settings OAuth2ClientConf { occAuthorizeUrl, occClientId, occClientSecret, occScopes, occTokenUrl } callbackUrl state =
@@ -79,12 +90,12 @@ redirectToAuthorizationPage ctx callbackR = do
                 authorizationUrl $
                     oauth2Settings (ocxConfig ctx) (Just redirectUri) state
 
-withAccessToken :: (MonadHandler m, MonadUnliftIO m) => OAuth2ClientContext -> (Text -> m a) -> m a
-withAccessToken ctx action = do
-    refreshTokenAndRetryOnFail ctx $ do
-        accessToken <- maybe (throwIO AuthorizationException) return =<< lookupSession (ocxSessionKey ctx SessionKeyAccessToken)
-        translateToAuthorizationException [401] $ 
-            action accessToken
+getAccessToken :: (MonadHandler m, MonadUnliftIO m) => OAuth2ClientContext -> m Text
+getAccessToken ctx = do
+    refreshNeeded <- isAccessTokenRefreshNeeded ctx
+    when refreshNeeded $ refreshAccessToken_ ctx
+    mtoken <- lookupAccessToken ctx
+    maybe (throwIO AuthorizationException) (pure . atoken) mtoken
 
 getOAuthCallbackUri :: (MonadHandler m) => Route (HandlerSite m) -> m Url
 getOAuthCallbackUri callbackR = do
@@ -93,40 +104,21 @@ getOAuthCallbackUri callbackR = do
     either (const $ throwString $ "Invalid callback uri: " <> T.unpack urlText) (pure . Url) $
         parseURI strictURIParserOptions (encodeUtf8 urlText)
 
-refreshTokenAndRetryOnFail :: (MonadHandler m, MonadUnliftIO m) => OAuth2ClientContext -> m a -> m a
-refreshTokenAndRetryOnFail ctx action = do
-
-        x <- try action
-
-        case x of
-            Left AuthorizationException -> do
-                
-                maybeRefreshToken <- lookupSession $ ocxSessionKey ctx SessionKeyRefreshToken
-
-                maybe
-                    (throwIO AuthorizationException)
-                    (\refreshToken -> do
-                        accessTokenResp <-
-                            liftIO $
-                                refreshAccessToken
-                                    (ocxHttpManager ctx)
-                                    (oauth2SettingsNoState (ocxConfig ctx) Nothing)
-                                    (RefreshToken refreshToken)
-                        tokens <- either (const $ throwIO AuthorizationException) return accessTokenResp
-                        storeTokens ctx tokens
-                        action)
-                    maybeRefreshToken
-
-            Right playlists -> return playlists
-
-translateToAuthorizationException :: (MonadUnliftIO m, Foldable t) => t Int -> m a -> m a
-translateToAuthorizationException statusCodes x = tryJust filterStatusCodeException x >>= either (const $ throwIO AuthorizationException) return
-    where
-        filterStatusCodeException :: HttpException -> Maybe HttpException
-        filterStatusCodeException e = case e of
-            HttpExceptionRequest _ (StatusCodeException response _) ->
-                if elem (statusCode $ responseStatus response) statusCodes then Just e else Nothing
-            _ -> Nothing
+refreshAccessToken_ :: (MonadHandler m, MonadUnliftIO m) => OAuth2ClientContext -> m ()
+refreshAccessToken_ ctx = do
+    maybeRefreshToken <- lookupSession $ ocxSessionKey ctx SessionKeyRefreshToken
+    maybe
+        (throwIO AuthorizationException)
+        (\refreshToken -> do
+            accessTokenResp <-
+                liftIO $
+                    refreshAccessToken
+                        (ocxHttpManager ctx)
+                        (oauth2SettingsNoState (ocxConfig ctx) Nothing)
+                        (RefreshToken refreshToken)
+            tokens <- either (const $ throwIO AuthorizationException) return accessTokenResp
+            storeTokens ctx tokens)
+        maybeRefreshToken
 
 data AuthorizationResponse
     = AuthorizationResponseSuccess Text
@@ -184,8 +176,35 @@ handleCallback ctx callbackR = do
   where
     onAuthorizationFailed :: (MonadHandler m) => m a
     onAuthorizationFailed = permissionDenied "Forbidden" 
-    
+
 storeTokens :: MonadHandler m => OAuth2ClientContext -> OAuth2Token -> m ()
-storeTokens ctx OAuth2Token { accessToken, refreshToken } = do
-    setSession (ocxSessionKey ctx SessionKeyAccessToken) $ atoken accessToken
-    maybe (return ()) (setSession $ ocxSessionKey ctx SessionKeyRefreshToken) $ rtoken <$> refreshToken
+storeTokens ctx token = do
+    accessTokenInfo <- createAccessTokenInfo token
+    setSessionBS (ocxSessionKey ctx SessionKeyAccessTokenInfo) $ BSL.toStrict $ B.encode accessTokenInfo
+    maybe (return ()) (setSession $ ocxSessionKey ctx SessionKeyRefreshToken) $ rtoken <$> refreshToken token
+
+createAccessTokenInfo :: (MonadIO m) => OAuth2Token -> m AccessTokenInfo
+createAccessTokenInfo OAuth2Token { accessToken, expiresIn } = do
+    receivedAt <- round <$> liftIO getPOSIXTime
+    pure $ AccessTokenInfo accessToken receivedAt expiresIn
+
+lookupAccessTokenInfo :: MonadHandler m => OAuth2ClientContext -> m (Maybe AccessTokenInfo)
+lookupAccessTokenInfo ctx = do
+    mbs <- lookupSessionBS (ocxSessionKey ctx SessionKeyAccessTokenInfo)
+    pure $ fmap (B.decode . BSL.fromStrict) mbs
+    
+lookupAccessToken :: MonadHandler m => OAuth2ClientContext -> m (Maybe AccessToken)
+lookupAccessToken ctx = fmap tokAccessToken <$> lookupAccessTokenInfo ctx
+
+isAccessTokenRefreshNeeded :: MonadHandler m => OAuth2ClientContext -> m Bool
+isAccessTokenRefreshNeeded ctx = do
+    maccessTokenInfo <- lookupAccessTokenInfo ctx
+    maybe
+        (pure True)
+        (\AccessTokenInfo { tokReceivedAtSeconds, tokExpiresInSeconds } -> do
+            let cfg = ocxConfig ctx
+            let expiresInSeconds = fromMaybe (occTokenExpiresInDefault cfg) tokExpiresInSeconds
+            let refreshAt = tokReceivedAtSeconds + expiresInSeconds - occRefreshTokenWhenExpiresIn cfg
+            time <- round <$> liftIO getPOSIXTime
+            pure $ time >= refreshAt)
+        maccessTokenInfo

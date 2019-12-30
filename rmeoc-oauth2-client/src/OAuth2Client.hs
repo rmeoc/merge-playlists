@@ -2,10 +2,11 @@ module OAuth2Client
     ( OAuth2ClientConf
     , OAuth2ClientContext
     , SessionKey(..)
+    , deleteOAuth2ClientContext
+    , getAccessToken
     , handleCallback
     , initOAuth2ClientContext
     , redirectToAuthorizationPage
-    , withAccessToken
     ) where
     
 import OAuth2Client.Context

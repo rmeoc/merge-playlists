@@ -5,6 +5,7 @@ dependencies:
 - aeson
 - aeson-casing
 - base
+- binary
 - bytestring
 - either
 - hoauth2
@@ -16,6 +17,7 @@ dependencies:
 - nonce
 - semigroupoids
 - text
+- time
 - unliftio
 - uri-bytestring
 - yesod-core

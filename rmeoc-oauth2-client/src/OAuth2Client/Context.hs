@@ -24,7 +24,6 @@ import Data.Text.Encoding       (encodeUtf8)
 import GHC.Generics             (Generic)
 import Network.HTTP.Client      (Manager)
 import URI.ByteString           (Absolute, URIRef, parseURI, strictURIParserOptions)
-import Yesod.Core               (Yesod, Route, mkYesodSubData, parseRoutesFile, renderRoute)
 
 import qualified Crypto.Nonce as N
 import qualified Control.Newtype as NT
@@ -47,13 +46,15 @@ data OAuth2ClientConf = OAuth2ClientConf
     , occClientSecret :: Text
     , occTokenUrl :: Url
     , occScopes :: [Text]
+    , occTokenExpiresInDefault :: Int
+    , occRefreshTokenWhenExpiresIn :: Int
     } deriving (Generic)
 
 instance FromJSON OAuth2ClientConf where
     parseJSON = genericParseJSON $ aesonPrefix trainCase
 
 data SessionKey
-    = SessionKeyAccessToken
+    = SessionKeyAccessTokenInfo
     | SessionKeyRefreshToken
     | SessionKeyState
 
