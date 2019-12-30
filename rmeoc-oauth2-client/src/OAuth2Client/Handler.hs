@@ -28,7 +28,7 @@ import Network.HTTP.Client          (HttpException(..), HttpExceptionContent(..)
 import Network.HTTP.Types.Status    (statusCode)
 import Network.OAuth.OAuth2         (ExchangeToken(..), OAuth2(..), OAuth2Token(..), RefreshToken(..),
                                      atoken, authorizationUrl, fetchAccessToken, refreshAccessToken, rtoken)
-import OAuth2Client.Foundation      (OAuth2ClientConf(..), OAuth2ClientSubsite(..), SessionKey(..), Url(..))
+import OAuth2Client.Context         (OAuth2ClientConf(..), OAuth2ClientContext(..), SessionKey(..), Url(..))
 import UnliftIO                     (MonadUnliftIO)
 import UnliftIO.Exception           (Exception, throwIO, throwString, try, tryJust)
 import URI.ByteString               (parseURI, queryL, queryPairsL, serializeURIRef', strictURIParserOptions)
@@ -68,21 +68,21 @@ oauth2SettingsNoState OAuth2ClientConf { occClientId, occClientSecret, occTokenU
         , oauthAccessTokenEndpoint = N.unpack occTokenUrl
         }
 
-redirectToAuthorizationPage :: (MonadHandler m) => OAuth2ClientSubsite -> Route (HandlerSite m) -> m a
-redirectToAuthorizationPage sy callbackR = do
-    state <- nonce128url $ ocsNonceGenerator sy
+redirectToAuthorizationPage :: (MonadHandler m) => OAuth2ClientContext -> Route (HandlerSite m) -> m a
+redirectToAuthorizationPage ctx callbackR = do
+    state <- nonce128url $ ocxNonceGenerator ctx
     redirectUri <- getOAuthCallbackUri callbackR
-    setSession (ocsSessionKey sy SessionKeyState) (decodeUtf8 state)
+    setSession (ocxSessionKey ctx SessionKeyState) (decodeUtf8 state)
     redirect $
         decodeUtf8 $
             serializeURIRef' $
                 authorizationUrl $
-                    oauth2Settings (ocsConfig sy) (Just redirectUri) state
+                    oauth2Settings (ocxConfig ctx) (Just redirectUri) state
 
-withAccessToken :: (MonadHandler m, MonadUnliftIO m) => OAuth2ClientSubsite -> (Text -> m a) -> m a
-withAccessToken sy action = do
-    refreshTokenAndRetryOnFail sy $ do
-        accessToken <- maybe (throwIO AuthorizationException) return =<< lookupSession (ocsSessionKey sy SessionKeyAccessToken)
+withAccessToken :: (MonadHandler m, MonadUnliftIO m) => OAuth2ClientContext -> (Text -> m a) -> m a
+withAccessToken ctx action = do
+    refreshTokenAndRetryOnFail ctx $ do
+        accessToken <- maybe (throwIO AuthorizationException) return =<< lookupSession (ocxSessionKey ctx SessionKeyAccessToken)
         translateToAuthorizationException [401] $ 
             action accessToken
 
@@ -93,15 +93,15 @@ getOAuthCallbackUri callbackR = do
     either (const $ throwString $ "Invalid callback uri: " <> T.unpack urlText) (pure . Url) $
         parseURI strictURIParserOptions (encodeUtf8 urlText)
 
-refreshTokenAndRetryOnFail :: (MonadHandler m, MonadUnliftIO m) => OAuth2ClientSubsite -> m a -> m a
-refreshTokenAndRetryOnFail sy action = do
+refreshTokenAndRetryOnFail :: (MonadHandler m, MonadUnliftIO m) => OAuth2ClientContext -> m a -> m a
+refreshTokenAndRetryOnFail ctx action = do
 
         x <- try action
 
         case x of
             Left AuthorizationException -> do
                 
-                maybeRefreshToken <- lookupSession $ ocsSessionKey sy SessionKeyRefreshToken
+                maybeRefreshToken <- lookupSession $ ocxSessionKey ctx SessionKeyRefreshToken
 
                 maybe
                     (throwIO AuthorizationException)
@@ -109,11 +109,11 @@ refreshTokenAndRetryOnFail sy action = do
                         accessTokenResp <-
                             liftIO $
                                 refreshAccessToken
-                                    (ocsHttpManager sy)
-                                    (oauth2SettingsNoState (ocsConfig sy) Nothing)
+                                    (ocxHttpManager ctx)
+                                    (oauth2SettingsNoState (ocxConfig ctx) Nothing)
                                     (RefreshToken refreshToken)
                         tokens <- either (const $ throwIO AuthorizationException) return accessTokenResp
-                        storeTokens sy tokens
+                        storeTokens ctx tokens
                         action)
                     maybeRefreshToken
 
@@ -132,9 +132,9 @@ data AuthorizationResponse
     = AuthorizationResponseSuccess Text
     | AuthorizationResponseError Text
 
-handleCallback :: (MonadHandler m) => OAuth2ClientSubsite -> Route (HandlerSite m) -> m ()
-handleCallback sy callbackR = do
-    let sessionKeyState = ocsSessionKey sy SessionKeyState
+handleCallback :: (MonadHandler m) => OAuth2ClientContext -> Route (HandlerSite m) -> m ()
+handleCallback ctx callbackR = do
+    let sessionKeyState = ocxSessionKey ctx SessionKeyState
 
     let withErrorMessage :: Text -> Maybe a -> Validation [Text] a
         withErrorMessage message = maybe (Failure [message]) pure
@@ -171,8 +171,8 @@ handleCallback sy callbackR = do
             accessTokenResp <-
                 liftIO $
                     fetchAccessToken
-                        (ocsHttpManager sy)
-                        (oauth2SettingsNoState (ocsConfig sy) $ Just redirectUri)
+                        (ocxHttpManager ctx)
+                        (oauth2SettingsNoState (ocxConfig ctx) $ Just redirectUri)
                         (ExchangeToken code)
             tokens <- either
                 (\err -> do
@@ -180,12 +180,12 @@ handleCallback sy callbackR = do
                     onAuthorizationFailed)
                 return
                 accessTokenResp
-            storeTokens sy tokens
+            storeTokens ctx tokens
   where
     onAuthorizationFailed :: (MonadHandler m) => m a
     onAuthorizationFailed = permissionDenied "Forbidden" 
     
-storeTokens :: MonadHandler m => OAuth2ClientSubsite -> OAuth2Token -> m ()
-storeTokens sy OAuth2Token { accessToken, refreshToken } = do
-    setSession (ocsSessionKey sy SessionKeyAccessToken) $ atoken accessToken
-    maybe (return ()) (setSession $ ocsSessionKey sy SessionKeyRefreshToken) $ rtoken <$> refreshToken
+storeTokens :: MonadHandler m => OAuth2ClientContext -> OAuth2Token -> m ()
+storeTokens ctx OAuth2Token { accessToken, refreshToken } = do
+    setSession (ocxSessionKey ctx SessionKeyAccessToken) $ atoken accessToken
+    maybe (return ()) (setSession $ ocxSessionKey ctx SessionKeyRefreshToken) $ rtoken <$> refreshToken

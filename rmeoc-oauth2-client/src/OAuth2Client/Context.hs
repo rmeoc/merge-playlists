@@ -6,13 +6,13 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE ViewPatterns          #-}
 
-module OAuth2Client.Foundation
+module OAuth2Client.Context
     ( OAuth2ClientConf(..)
-    , OAuth2ClientSubsite(..)
+    , OAuth2ClientContext(..)
     , SessionKey(..)
     , Url(..)
-    , deleteOAuth2ClientSubsite
-    , initOAuth2ClientSubsite
+    , deleteOAuth2ClientContext
+    , initOAuth2ClientContext
     ) where
 
 import Control.Monad.IO.Class   (MonadIO)
@@ -57,22 +57,22 @@ data SessionKey
     | SessionKeyRefreshToken
     | SessionKeyState
 
-data OAuth2ClientSubsite = OAuth2ClientSubsite
-    { ocsSessionKey :: SessionKey -> Text
-    , ocsConfig :: OAuth2ClientConf
-    , ocsNonceGenerator :: N.Generator
-    , ocsHttpManager :: Manager
+data OAuth2ClientContext = OAuth2ClientContext
+    { ocxSessionKey :: SessionKey -> Text
+    , ocxConfig :: OAuth2ClientConf
+    , ocxNonceGenerator :: N.Generator
+    , ocxHttpManager :: Manager
     }
 
-initOAuth2ClientSubsite :: MonadIO m => (SessionKey -> Text) -> OAuth2ClientConf -> Manager -> m OAuth2ClientSubsite
-initOAuth2ClientSubsite translateSessionKey conf manager = do
+initOAuth2ClientContext :: MonadIO m => (SessionKey -> Text) -> OAuth2ClientConf -> Manager -> m OAuth2ClientContext
+initOAuth2ClientContext translateSessionKey conf manager = do
     nonceGen <- N.new
-    return OAuth2ClientSubsite
-        { ocsSessionKey = translateSessionKey
-        , ocsConfig = conf
-        , ocsNonceGenerator = nonceGen
-        , ocsHttpManager = manager
+    return OAuth2ClientContext
+        { ocxSessionKey = translateSessionKey
+        , ocxConfig = conf
+        , ocxNonceGenerator = nonceGen
+        , ocxHttpManager = manager
         }
 
-deleteOAuth2ClientSubsite :: MonadIO m => OAuth2ClientSubsite -> m ()
-deleteOAuth2ClientSubsite subsite = N.delete $ ocsNonceGenerator subsite
+deleteOAuth2ClientContext :: MonadIO m => OAuth2ClientContext -> m ()
+deleteOAuth2ClientContext subsite = N.delete $ ocxNonceGenerator subsite

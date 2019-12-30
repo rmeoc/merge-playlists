@@ -35,7 +35,7 @@ import Network.Wai.Middleware.RequestLogger (Destination (Logger),
                                              IPAddrSource (..),
                                              OutputFormat (..), destination,
                                              mkRequestLogger, outputFormat)
-import OAuth2Client                         (initOAuth2ClientSubsite)
+import OAuth2Client                         (initOAuth2ClientContext)
 import System.Log.FastLogger                (defaultBufSize, newStdoutLoggerSet,
                                              toLogStr)
 
@@ -78,9 +78,8 @@ makeFoundation appSettings = do
         (appStaticDir appSettings)
     appGenerated <- static (appGeneratedDir appSettings)
 
-    -- initOAuth2ClientSubsite :: MonadIO m => (SessionKey -> Text) -> OAuth2ClientConf -> Manager -> m OAuth2ClientSubsite
-    appSpotifyClientSubsite <-
-        initOAuth2ClientSubsite
+    appSpotifyClientContext <-
+        initOAuth2ClientContext
             (translateSessionKey . SessionKeySpotifyClient)
             (appSpotifyClientConf appSettings)
             appHttpManager

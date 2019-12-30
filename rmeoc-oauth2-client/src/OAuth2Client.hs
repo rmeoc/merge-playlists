@@ -1,12 +1,12 @@
 module OAuth2Client
     ( OAuth2ClientConf
-    , OAuth2ClientSubsite
+    , OAuth2ClientContext
     , SessionKey(..)
     , handleCallback
-    , initOAuth2ClientSubsite
+    , initOAuth2ClientContext
     , redirectToAuthorizationPage
     , withAccessToken
     ) where
     
-import OAuth2Client.Foundation
+import OAuth2Client.Context
 import OAuth2Client.Handler

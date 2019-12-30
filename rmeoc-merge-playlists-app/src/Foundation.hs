@@ -12,7 +12,7 @@ module Foundation where
 
 import Import.NoFoundation
 import Database.Persist.Sql (ConnectionPool, runSqlPool)
-import OAuth2Client         (OAuth2ClientSubsite, redirectToAuthorizationPage)
+import OAuth2Client         (OAuth2ClientContext, redirectToAuthorizationPage)
 import Text.Hamlet          (hamletFile)
 import Text.Jasmine         (minifym)
 import Control.Monad.Logger (LogSource)
@@ -42,7 +42,7 @@ data App = App
     , appConnPool    :: ConnectionPool -- ^ Database connection pool.
     , appHttpManager :: Manager
     , appLogger      :: Logger
-    , appSpotifyClientSubsite :: OAuth2ClientSubsite
+    , appSpotifyClientContext :: OAuth2ClientContext
     }
 
 data MenuItem = MenuItem
@@ -285,7 +285,7 @@ instance YesodAuth App where
     onLogin :: (MonadHandler m, HandlerSite m ~ App) => m ()
     onLogin = do
         y <- getYesod
-        redirectToAuthorizationPage (appSpotifyClientSubsite y) SpotifyCallbackLoginR
+        redirectToAuthorizationPage (appSpotifyClientContext y) SpotifyCallbackLoginR
 
 -- | Access function to determine if a user is logged in.
 isAuthenticated :: Handler AuthResult

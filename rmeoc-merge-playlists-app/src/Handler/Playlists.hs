@@ -11,7 +11,7 @@ import Data.List                    (sortBy)
 import Data.Maybe                   (fromMaybe, listToMaybe)
 import Data.Ord                     (Down(..), comparing)
 import Data.Text                    (Text)
-import Foundation                   (App, Handler, Route(..), Widget, appSpotifyClientSubsite)
+import Foundation                   (App, Handler, Route(..), Widget, appSpotifyClientContext)
 import OAuth2Client                 (withAccessToken)
 import SpotifyClient                (getListOfPlaylists)
 import UnliftIO                     (MonadUnliftIO)
@@ -26,7 +26,7 @@ import qualified SpotifyClient.Types as S
 runSpotify :: (MonadHandler m, MonadUnliftIO m, HandlerSite m ~ App) => ReaderT S.SpotifyClientContext m b -> ReaderT WS.Session m b
 runSpotify mx = do
     y <- getYesod
-    withAccessToken (appSpotifyClientSubsite y) $ \token -> 
+    withAccessToken (appSpotifyClientContext y) $ \token -> 
         withReaderT (flip S.SpotifyClientContext token) mx
 
 getPlaylistsR :: Handler Html
