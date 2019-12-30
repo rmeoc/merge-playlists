@@ -12,7 +12,7 @@
 {-# LANGUAGE TypeFamilies              #-}
 {-# OPTIONS_GHC -fno-warn-orphans      #-}
 
-module OAuth2Client.Handler (withAccessToken, withAccessToken_) where
+module OAuth2Client.Handler (handleCallback, withAccessToken, withAccessToken_) where
 
 import Control.Lens                 ((&), (.~))
 import Control.Monad                (when)
@@ -29,8 +29,7 @@ import Network.HTTP.Client          (HttpException(..), HttpExceptionContent(..)
 import Network.HTTP.Types.Status    (statusCode)
 import Network.OAuth.OAuth2         (ExchangeToken(..), OAuth2(..), OAuth2Token(..), RefreshToken(..),
                                      atoken, authorizationUrl, fetchAccessToken, refreshAccessToken, rtoken)
-import OAuth2Client.Foundation      (OAuth2ClientConf(..), OAuth2ClientSubsite(..), Route(..), SessionKey(..), Url(..),
-                                    resourcesOAuth2ClientSubsite)
+import OAuth2Client.Foundation      (OAuth2ClientConf(..), OAuth2ClientSubsite(..), Route(..), SessionKey(..), Url(..))
 import UnliftIO                     (MonadUnliftIO)
 import UnliftIO.Exception           (Exception, throwIO, throwString, try, tryJust)
 import URI.ByteString               (parseURI, queryL, queryPairsL, serializeURIRef', strictURIParserOptions)
@@ -71,9 +70,9 @@ oauth2SettingsNoState OAuth2ClientConf { occClientId, occClientSecret, occTokenU
         , oauthAccessTokenEndpoint = N.unpack occTokenUrl
         }
 
-withAccessToken :: (MonadHandler m, MonadUnliftIO m) => OAuth2ClientSubsite -> (Route OAuth2ClientSubsite -> Route (HandlerSite m)) -> (Text -> m a) -> m a
-withAccessToken sy toParent action = do
-    redirectToAuthorizeOnFail sy toParent $ withAccessToken_ sy action
+withAccessToken :: (MonadHandler m, MonadUnliftIO m) => OAuth2ClientSubsite -> Route (HandlerSite m) -> (Text -> m a) -> m a
+withAccessToken sy callbackR action = do
+    redirectToAuthorizeOnFail sy callbackR $ withAccessToken_ sy action
 
 withAccessToken_ :: (MonadHandler m, MonadUnliftIO m) => OAuth2ClientSubsite -> (Text -> m a) -> m a
 withAccessToken_ sy action = do
@@ -82,15 +81,15 @@ withAccessToken_ sy action = do
         translateToAuthorizationException [401] $ 
             action accessToken
 
-getOAuthCallbackUri :: (MonadHandler m) => (Route OAuth2ClientSubsite -> Route (HandlerSite m)) -> m Url
-getOAuthCallbackUri toParent = do
+getOAuthCallbackUri :: (MonadHandler m) => Route (HandlerSite m) -> m Url
+getOAuthCallbackUri callbackR = do
     urlRender <- getUrlRender
-    let urlText = urlRender $ toParent CallbackR
+    let urlText = urlRender callbackR
     either (const $ throwString $ "Invalid callback uri: " <> T.unpack urlText) (pure . Url) $
         parseURI strictURIParserOptions (encodeUtf8 urlText)
 
-redirectToAuthorizeOnFail :: (MonadHandler m, MonadUnliftIO m) => OAuth2ClientSubsite -> (Route OAuth2ClientSubsite -> Route (HandlerSite m)) -> m a -> m a
-redirectToAuthorizeOnFail sy toParent action = do
+redirectToAuthorizeOnFail :: (MonadHandler m, MonadUnliftIO m) => OAuth2ClientSubsite -> Route (HandlerSite m) -> m a -> m a
+redirectToAuthorizeOnFail sy callbackR action = do
         
         x <- try action
         
@@ -103,7 +102,7 @@ redirectToAuthorizeOnFail sy toParent action = do
                 when retrying $ throwIO AuthorizationException
 
                 state <- nonce128url $ ocsNonceGenerator sy
-                redirectUri <- getOAuthCallbackUri toParent
+                redirectUri <- getOAuthCallbackUri callbackR
 
                 setSession (ocsSessionKey sy SessionKeyState) (decodeUtf8 state)
                 setSession sessionKeyRetrying ""
@@ -156,26 +155,8 @@ data AuthorizationResponse
     = AuthorizationResponseSuccess Text
     | AuthorizationResponseError Text
 
-instance Yesod master => YesodSubDispatch OAuth2ClientSubsite master where
-    yesodSubDispatch = $(mkYesodSubDispatch resourcesOAuth2ClientSubsite)
-
-getDummyR :: (MonadHandler m, Yesod (HandlerSite m)) => m Html
-getDummyR = do
-    liftHandler $
-        defaultLayout $
-            [whamlet|
-                <h1>Dummy Page
-            |]
-
-onAuthorizationFailed :: (MonadHandler m, SubHandlerSite m ~ OAuth2ClientSubsite) => m a
-onAuthorizationFailed = do
-    sy <- getSubYesod
-    deleteSession $ ocsSessionKey sy SessionKeyRetryingWithNewAccessToken
-    permissionDenied "Forbidden" 
-    
-getCallbackR :: (MonadHandler m, SubHandlerSite m ~ OAuth2ClientSubsite) => m ()
-getCallbackR = do
-    sy <- getSubYesod
+handleCallback :: (MonadHandler m) => OAuth2ClientSubsite -> Route (HandlerSite m) -> Route (HandlerSite m) -> m ()
+handleCallback sy callbackR dummyR = do
     let sessionKeyState = ocsSessionKey sy SessionKeyState
 
     let withErrorMessage :: Text -> Maybe a -> Validation [Text] a
@@ -209,8 +190,7 @@ getCallbackR = do
             onAuthorizationFailed
 
         AuthorizationResponseSuccess code -> do
-            toParent <- getRouteToParent
-            redirectUri <- getOAuthCallbackUri toParent
+            redirectUri <- getOAuthCallbackUri callbackR
             accessTokenResp <-
                 liftIO $
                     fetchAccessToken
@@ -224,8 +204,13 @@ getCallbackR = do
                 return
                 accessTokenResp
             storeTokens sy tokens
-            redirectUltDest (toParent DummyR)
-
+            redirectUltDest dummyR
+  where
+    onAuthorizationFailed :: (MonadHandler m) => m a
+    onAuthorizationFailed = do
+        deleteSession $ ocsSessionKey sy SessionKeyRetryingWithNewAccessToken
+        permissionDenied "Forbidden" 
+    
 storeTokens :: MonadHandler m => OAuth2ClientSubsite -> OAuth2Token -> m ()
 storeTokens sy OAuth2Token { accessToken, refreshToken } = do
     setSession (ocsSessionKey sy SessionKeyAccessToken) $ atoken accessToken

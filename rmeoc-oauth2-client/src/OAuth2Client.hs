@@ -3,6 +3,7 @@ module OAuth2Client
     , OAuth2ClientSubsite
     , Route(..)
     , SessionKey(..)
+    , handleCallback
     , initOAuth2ClientSubsite
     , withAccessToken
     , withAccessToken_

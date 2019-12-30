@@ -14,7 +14,6 @@ module OAuth2Client.Foundation
     , Url(..)
     , deleteOAuth2ClientSubsite
     , initOAuth2ClientSubsite
-    , resourcesOAuth2ClientSubsite
     ) where
 
 import Control.Monad.IO.Class   (MonadIO)
@@ -66,10 +65,6 @@ data OAuth2ClientSubsite = OAuth2ClientSubsite
     , ocsNonceGenerator :: N.Generator
     , ocsHttpManager :: Manager
     }
-
-mkYesodSubData "OAuth2ClientSubsite" $(parseRoutesFile "routes")
-
-instance Yesod OAuth2ClientSubsite
 
 initOAuth2ClientSubsite :: MonadIO m => (SessionKey -> Text) -> OAuth2ClientConf -> Manager -> m OAuth2ClientSubsite
 initOAuth2ClientSubsite translateSessionKey conf manager = do

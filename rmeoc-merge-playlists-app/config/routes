@@ -4,12 +4,13 @@
 /static         StaticR         Static                  appStatic
 /generated      GeneratedR      Static                  appGenerated
 /auth           AuthR           Auth                    getAuth
-/spotify-client SpotifyClientR  OAuth2ClientSubsite     appSpotifyClientSubsite
 
-/favicon.ico FaviconR GET
-/robots.txt RobotsR GET
+/spotify/callback           SpotifyCallbackR  GET
 
-/           HomeR       GET
-/playlists  PlaylistsR  GET
+/favicon.ico                FaviconR          GET
+/robots.txt                 RobotsR           GET
 
-/profile ProfileR GET
+/                           HomeR             GET
+/playlists                  PlaylistsR        GET
+
+/profile                    ProfileR          GET

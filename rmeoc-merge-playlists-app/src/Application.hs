@@ -48,6 +48,7 @@ import Handler.Common
 import Handler.Home
 import Handler.Profile
 import Handler.Playlists
+import Handler.SpotifyCallback
 
 data SessionKey = SessionKeySpotifyClient OA.SessionKey
 

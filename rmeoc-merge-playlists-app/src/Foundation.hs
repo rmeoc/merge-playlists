@@ -188,7 +188,7 @@ instance Yesod App where
     -- delegate to that function
     isAuthorized ProfileR _ = isAuthenticated
     isAuthorized PlaylistsR _ = isAuthenticated
-    isAuthorized (SpotifyClientR _) _ = isAuthenticated
+    isAuthorized SpotifyCallbackR _ = isAuthenticated
 
     -- This function creates static content files in the static folder
     -- and names them based on a hash of their content. This allows
