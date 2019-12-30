@@ -9,7 +9,6 @@
 module OAuth2Client.Foundation
     ( OAuth2ClientConf(..)
     , OAuth2ClientSubsite(..)
-    , Route(..)
     , SessionKey(..)
     , Url(..)
     , deleteOAuth2ClientSubsite
@@ -57,7 +56,6 @@ data SessionKey
     = SessionKeyAccessToken
     | SessionKeyRefreshToken
     | SessionKeyState
-    | SessionKeyRetryingWithNewAccessToken
 
 data OAuth2ClientSubsite = OAuth2ClientSubsite
     { ocsSessionKey :: SessionKey -> Text

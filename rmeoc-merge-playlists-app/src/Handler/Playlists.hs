@@ -12,7 +12,7 @@ import Data.Maybe                   (fromMaybe, listToMaybe)
 import Data.Ord                     (Down(..), comparing)
 import Data.Text                    (Text)
 import Foundation                   (App, Handler, Route(..), Widget, appSpotifyClientSubsite)
-import OAuth2Client                 (Route(..), withAccessToken)
+import OAuth2Client                 (withAccessToken)
 import SpotifyClient                (getListOfPlaylists)
 import UnliftIO                     (MonadUnliftIO)
 import Yesod.Core                   (HandlerSite, Html, MonadHandler, defaultLayout, getYesod, liftIO, whamlet)
@@ -26,7 +26,7 @@ import qualified SpotifyClient.Types as S
 runSpotify :: (MonadHandler m, MonadUnliftIO m, HandlerSite m ~ App) => ReaderT S.SpotifyClientContext m b -> ReaderT WS.Session m b
 runSpotify mx = do
     y <- getYesod
-    withAccessToken (appSpotifyClientSubsite y) SpotifyCallbackR $ \token -> 
+    withAccessToken (appSpotifyClientSubsite y) $ \token -> 
         withReaderT (flip S.SpotifyClientContext token) mx
 
 getPlaylistsR :: Handler Html

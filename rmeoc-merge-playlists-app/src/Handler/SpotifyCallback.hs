@@ -1,13 +1,19 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
-module Handler.SpotifyCallback(getSpotifyCallbackR) where
+module Handler.SpotifyCallback(getSpotifyCallbackLoginR) where
 
 import Foundation                   (Handler, Route(..), appSpotifyClientSubsite)
 import OAuth2Client                 (handleCallback)
-import Yesod.Core                   (getYesod)
+import Yesod.Auth                   (loginDest)
+import Yesod.Core                   (getYesod, redirectUltDest)
+import Import
+
+import qualified Yesod.Auth.Message as AuthMsg
 
 
-getSpotifyCallbackR :: Handler ()
-getSpotifyCallbackR = do
+getSpotifyCallbackLoginR :: Handler ()
+getSpotifyCallbackLoginR = do
     y <- getYesod
-    handleCallback (appSpotifyClientSubsite y) SpotifyCallbackR HomeR
+    handleCallback (appSpotifyClientSubsite y) SpotifyCallbackLoginR
+    setMessageI AuthMsg.NowLoggedIn
+    redirectUltDest $ loginDest y

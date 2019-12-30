@@ -12,7 +12,7 @@ module Foundation where
 
 import Import.NoFoundation
 import Database.Persist.Sql (ConnectionPool, runSqlPool)
-import OAuth2Client         (OAuth2ClientSubsite)
+import OAuth2Client         (OAuth2ClientSubsite, redirectToAuthorizationPage)
 import Text.Hamlet          (hamletFile)
 import Text.Jasmine         (minifym)
 import Control.Monad.Logger (LogSource)
@@ -188,7 +188,7 @@ instance Yesod App where
     -- delegate to that function
     isAuthorized ProfileR _ = isAuthenticated
     isAuthorized PlaylistsR _ = isAuthenticated
-    isAuthorized SpotifyCallbackR _ = isAuthenticated
+    isAuthorized SpotifyCallbackLoginR _ = isAuthenticated
 
     -- This function creates static content files in the static folder
     -- and names them based on a hash of their content. This allows
@@ -281,6 +281,11 @@ instance YesodAuth App where
             [ Just $ auth0Plugin $ appAuth0Settings $ appSettings app
             , if appAuthDummyLogin $ appSettings app then Just authDummy else Nothing
             ]
+    
+    onLogin :: (MonadHandler m, HandlerSite m ~ App) => m ()
+    onLogin = do
+        y <- getYesod
+        redirectToAuthorizationPage (appSpotifyClientSubsite y) SpotifyCallbackLoginR
 
 -- | Access function to determine if a user is logged in.
 isAuthenticated :: Handler AuthResult

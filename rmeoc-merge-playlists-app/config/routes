@@ -5,12 +5,12 @@
 /generated      GeneratedR      Static                  appGenerated
 /auth           AuthR           Auth                    getAuth
 
-/spotify/callback           SpotifyCallbackR  GET
+/spotify/callback/login     SpotifyCallbackLoginR   GET
 
-/favicon.ico                FaviconR          GET
-/robots.txt                 RobotsR           GET
+/favicon.ico                FaviconR                GET
+/robots.txt                 RobotsR                 GET
 
-/                           HomeR             GET
-/playlists                  PlaylistsR        GET
+/                           HomeR                   GET
+/playlists                  PlaylistsR              GET
 
-/profile                    ProfileR          GET
+/profile                    ProfileR                GET

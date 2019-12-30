@@ -12,7 +12,7 @@
 {-# LANGUAGE TypeFamilies              #-}
 {-# OPTIONS_GHC -fno-warn-orphans      #-}
 
-module OAuth2Client.Handler (handleCallback, withAccessToken, withAccessToken_) where
+module OAuth2Client.Handler (handleCallback, redirectToAuthorizationPage, withAccessToken) where
 
 import Control.Lens                 ((&), (.~))
 import Control.Monad                (when)
@@ -21,7 +21,6 @@ import Crypto.Nonce                 (nonce128url)
 import Data.ByteString              (ByteString)
 import Data.Either.Validation       (Validation(..), eitherToValidation, validationToEither)
 import Data.Functor.Alt             ((<!>))
-import Data.Maybe                   (isJust)
 import Data.Text                    (Text)
 import Data.Text.Encoding           (decodeUtf8, encodeUtf8)
 import Data.Typeable                (Typeable)
@@ -29,18 +28,17 @@ import Network.HTTP.Client          (HttpException(..), HttpExceptionContent(..)
 import Network.HTTP.Types.Status    (statusCode)
 import Network.OAuth.OAuth2         (ExchangeToken(..), OAuth2(..), OAuth2Token(..), RefreshToken(..),
                                      atoken, authorizationUrl, fetchAccessToken, refreshAccessToken, rtoken)
-import OAuth2Client.Foundation      (OAuth2ClientConf(..), OAuth2ClientSubsite(..), Route(..), SessionKey(..), Url(..))
+import OAuth2Client.Foundation      (OAuth2ClientConf(..), OAuth2ClientSubsite(..), SessionKey(..), Url(..))
 import UnliftIO                     (MonadUnliftIO)
 import UnliftIO.Exception           (Exception, throwIO, throwString, try, tryJust)
 import URI.ByteString               (parseURI, queryL, queryPairsL, serializeURIRef', strictURIParserOptions)
-import Yesod.Core                   (HandlerSite, Html, MonadHandler, SubHandlerSite,
-                                     Yesod, YesodSubDispatch, defaultLayout, deleteSession, getRouteToParent,
-                                     getSubYesod, getUrlRender, liftHandler, liftIO, logError,
-                                     lookupGetParam, lookupSession, mkYesodSubDispatch, permissionDenied,
-                                     redirect, redirectUltDest, setSession, setUltDestCurrent, whamlet, yesodSubDispatch)
+import Yesod.Core                   (HandlerSite, MonadHandler, Route, deleteSession, getUrlRender, liftIO,
+                                     logError, lookupGetParam, lookupSession, permissionDenied, redirect,
+                                     setSession)
 
 import qualified Control.Newtype as N
 import qualified Data.Text as T
+
 
 data AuthorizationException = AuthorizationException deriving (Show, Typeable)
 
@@ -70,12 +68,19 @@ oauth2SettingsNoState OAuth2ClientConf { occClientId, occClientSecret, occTokenU
         , oauthAccessTokenEndpoint = N.unpack occTokenUrl
         }
 
-withAccessToken :: (MonadHandler m, MonadUnliftIO m) => OAuth2ClientSubsite -> Route (HandlerSite m) -> (Text -> m a) -> m a
-withAccessToken sy callbackR action = do
-    redirectToAuthorizeOnFail sy callbackR $ withAccessToken_ sy action
+redirectToAuthorizationPage :: (MonadHandler m) => OAuth2ClientSubsite -> Route (HandlerSite m) -> m a
+redirectToAuthorizationPage sy callbackR = do
+    state <- nonce128url $ ocsNonceGenerator sy
+    redirectUri <- getOAuthCallbackUri callbackR
+    setSession (ocsSessionKey sy SessionKeyState) (decodeUtf8 state)
+    redirect $
+        decodeUtf8 $
+            serializeURIRef' $
+                authorizationUrl $
+                    oauth2Settings (ocsConfig sy) (Just redirectUri) state
 
-withAccessToken_ :: (MonadHandler m, MonadUnliftIO m) => OAuth2ClientSubsite -> (Text -> m a) -> m a
-withAccessToken_ sy action = do
+withAccessToken :: (MonadHandler m, MonadUnliftIO m) => OAuth2ClientSubsite -> (Text -> m a) -> m a
+withAccessToken sy action = do
     refreshTokenAndRetryOnFail sy $ do
         accessToken <- maybe (throwIO AuthorizationException) return =<< lookupSession (ocsSessionKey sy SessionKeyAccessToken)
         translateToAuthorizationException [401] $ 
@@ -88,34 +93,6 @@ getOAuthCallbackUri callbackR = do
     either (const $ throwString $ "Invalid callback uri: " <> T.unpack urlText) (pure . Url) $
         parseURI strictURIParserOptions (encodeUtf8 urlText)
 
-redirectToAuthorizeOnFail :: (MonadHandler m, MonadUnliftIO m) => OAuth2ClientSubsite -> Route (HandlerSite m) -> m a -> m a
-redirectToAuthorizeOnFail sy callbackR action = do
-        
-        x <- try action
-        
-        let sessionKeyRetrying = ocsSessionKey sy SessionKeyRetryingWithNewAccessToken
-        retrying <- fmap isJust $ lookupSession sessionKeyRetrying
-        deleteSession sessionKeyRetrying
-        case x of
-            Left AuthorizationException -> do
-                
-                when retrying $ throwIO AuthorizationException
-
-                state <- nonce128url $ ocsNonceGenerator sy
-                redirectUri <- getOAuthCallbackUri callbackR
-
-                setSession (ocsSessionKey sy SessionKeyState) (decodeUtf8 state)
-                setSession sessionKeyRetrying ""
-                setUltDestCurrent
-                
-                redirect $
-                    decodeUtf8 $
-                        serializeURIRef' $
-                            authorizationUrl $
-                                oauth2Settings (ocsConfig sy) (Just redirectUri) state
-
-            Right actionResult -> return actionResult
-    
 refreshTokenAndRetryOnFail :: (MonadHandler m, MonadUnliftIO m) => OAuth2ClientSubsite -> m a -> m a
 refreshTokenAndRetryOnFail sy action = do
 
@@ -155,8 +132,8 @@ data AuthorizationResponse
     = AuthorizationResponseSuccess Text
     | AuthorizationResponseError Text
 
-handleCallback :: (MonadHandler m) => OAuth2ClientSubsite -> Route (HandlerSite m) -> Route (HandlerSite m) -> m ()
-handleCallback sy callbackR dummyR = do
+handleCallback :: (MonadHandler m) => OAuth2ClientSubsite -> Route (HandlerSite m) -> m ()
+handleCallback sy callbackR = do
     let sessionKeyState = ocsSessionKey sy SessionKeyState
 
     let withErrorMessage :: Text -> Maybe a -> Validation [Text] a
@@ -204,12 +181,9 @@ handleCallback sy callbackR dummyR = do
                 return
                 accessTokenResp
             storeTokens sy tokens
-            redirectUltDest dummyR
   where
     onAuthorizationFailed :: (MonadHandler m) => m a
-    onAuthorizationFailed = do
-        deleteSession $ ocsSessionKey sy SessionKeyRetryingWithNewAccessToken
-        permissionDenied "Forbidden" 
+    onAuthorizationFailed = permissionDenied "Forbidden" 
     
 storeTokens :: MonadHandler m => OAuth2ClientSubsite -> OAuth2Token -> m ()
 storeTokens sy OAuth2Token { accessToken, refreshToken } = do
