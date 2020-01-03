@@ -13,6 +13,7 @@ module SpotifyClient.Types
     , PlaylistTrack(..)
     , Restrictions(..)
     , SpotifyClientContext(..)
+    , SpotifyPagingParams(..)
     , Track(..)
     , TrackLink(..)
     , Tracks(..)
@@ -34,6 +35,10 @@ import qualified Network.Wreq.Session as WS
 data SpotifyClientContext = SpotifyClientContext
     { sccWreqSession :: WS.Session
     , sccAccessToken :: Text
+    }
+
+data SpotifyPagingParams = SpotifyPagingParams
+    { sppLimit :: Int
     }
 
 newtype PlaylistId = PlaylistId { unPlaylistId :: Text } deriving (Eq, FromJSON, PathPiece, Read, Show)

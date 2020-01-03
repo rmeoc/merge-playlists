@@ -42,6 +42,7 @@ dependencies:
 - case-insensitive
 - wai
 - foreign-store
+- attoparsec
 - clientsession
 - hoauth2
 - jose

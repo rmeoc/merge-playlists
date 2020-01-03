@@ -15,31 +15,29 @@
 module SpotifyClient
     ( ClonePlaylistParameters(..)
     , CreatePlaylistResult(..)
-    , PlaylistId
+    , Direction(..)
+    , PageRef(..)
+    , PlaylistId(..)
     , clonePlaylist
     , createPlaylist
-    , getListOfPlaylists
+    , getPlaylistPage
     , getPlaylistTracks
     , playlistTracksSink
     , playlistTracksSource
-    , unPlaylistId
     ) where
 
 import Conduit
-import Control.Applicative          (liftA2)
 import Control.Lens                 ((&), (.~), (?~), (^.))
-import Control.Monad                (when)
 import Control.Monad.IO.Class       (MonadIO, liftIO)
 import Control.Monad.Reader         (MonadReader, ask)
-import Data.Aeson                   (FromJSON, (.:))
+import Data.Aeson                   (FromJSON, (.:), parseJSON)
 import Data.ByteString.Builder      (intDec)
 import Data.ByteString.Lazy         (ByteString)
 import Data.Conduit.Combinators     (mapM_E, vectorBuilder)
-import Data.List.NonEmpty           (NonEmpty(..))
-import Data.Monoid                  (Sum(..))
+import Data.Conduit.List            (unfoldM)
+import Data.Maybe                   (catMaybes)
 import Data.Text                    (Text)
 import Data.Text.Encoding           (encodeUtf8)
-import Data.Traversable             (for)
 import Data.Vector                  (Vector)
 import Network.Wreq                 (responseBody)
 import SpotifyClient.Types          (PlaylistId, unPlaylistId)
@@ -51,7 +49,6 @@ import qualified Blaze.ByteString.Builder as BL
 import qualified Data.Aeson as J
 import qualified Data.Aeson.Types as J
 import qualified Data.ByteString.Char8 as BS8
-import qualified Data.List.NonEmpty as NE
 import qualified Data.Vector as V
 import qualified Network.Wreq as W
 import qualified Network.Wreq.Session as WS
@@ -85,91 +82,198 @@ post' url payload = supplyWreqOptionsAndSession $ \options session -> liftIO $ W
 asJSON' :: (MonadIO m, FromJSON a) => W.Response ByteString -> m (W.Response a) 
 asJSON' = liftIO . W.asJSON
 
-getListOfPlaylists :: (MonadIO m, MonadReader S.SpotifyClientContext m) => Integer -> Integer -> m (S.Paging S.PlaylistSimplified)
-getListOfPlaylists offset limit = do
-
-    playlistsResp <-
-        asJSON' =<< get'
-            (BS8.unpack $ serializeURIRef' $
-                [uri|https://api.spotify.com/v1/me/playlists|]
-                    & queryL .queryPairsL .~ 
-                        [ ("offset", BS8.pack $ show offset)
-                        , ("limit", BS8.pack $ show limit)
-                        ])
-
-    return $ playlistsResp ^. responseBody    
-
 getPlaylistTracks :: (MonadUnliftIO m, MonadReader S.SpotifyClientContext m) => PlaylistId -> m (Vector Text)
 getPlaylistTracks playlistId = do
-    let pipeline = playlistTracksSource playlistId .| foldMapC VB.vector
+    let pipeline = playlistTracksSource playlistId pagingParams .| foldMapC VB.vector
     builder <- runConduit pipeline
     return $ VB.build builder
+  where
+    pagingParams = 
+        S.SpotifyPagingParams
+            { S.sppLimit = 100
+            }
 
-playlistTracksSource :: (MonadIO m, MonadReader S.SpotifyClientContext m) => PlaylistId -> ConduitT () (Vector Text) m ()
-playlistTracksSource playlistId = do
 
-        let itemTrackUriField = "items(track(uri))"
+data Direction = Reverse | Forward deriving Show
 
-        response1 <- requestTracks (itemTrackUriField :| ["total"]) 0
-        tracks1 <- getTracksFromResponse response1
-        yield tracks1
-        
-        totalNumberOfTracks <- either throwString return $
-            flip J.parseEither response1 $ \obj -> obj .: "total"
+data PageRef = PageRef { pageRefDirection :: Direction, pageRefOffset :: Int, pageRefLimit :: Int } deriving Show
 
-        Sum numberOfTracksReceived <- foldr
-            (\offset -> 
-                liftA2 mappend $
-                    do
-                        resp <- requestTracks (itemTrackUriField :| []) offset
-                        tracks <- getTracksFromResponse resp
-                        yield tracks
-                        return $ Sum $ V.length tracks)
-            (pure $ Sum $ V.length tracks1)
-            [maxNumberOfTrackPerRequest, 2*maxNumberOfTrackPerRequest ..totalNumberOfTracks-1]
+reverseDirection :: Direction -> Direction
+reverseDirection Reverse = Forward
+reverseDirection Forward = Reverse
 
-        when (numberOfTracksReceived /= totalNumberOfTracks) $
-            throwString $ "Number of tracks actually received (" <> show numberOfTracksReceived
-                <> ") does not match number of tracks that was initially reported ("
-                <> show totalNumberOfTracks <> ")."
-
-        return ()
-
+getPlaylistPage :: forall m. (MonadIO m, MonadReader S.SpotifyClientContext m) => PageRef -> m (Maybe PageRef, Vector S.PlaylistSimplified, Maybe PageRef)
+getPlaylistPage pageRef = runConduit $ do
+        hasBefore <- playlistsBehind .| not <$> nullCE
+        (playlists, hasAfter) <- playlistsAhead .| ((,) <$> getPageItems <*> (not <$> nullCE))
+        let
+            (hasPrev, hasNext) = case pageRefDirection pageRef of
+                Forward -> (hasBefore, hasAfter)
+                Reverse -> (hasAfter, hasBefore)
+            playlists' = fmap snd playlists
+            playlists'' = case pageRefDirection pageRef of
+                Forward -> playlists'
+                Reverse -> V.reverse playlists'
+        pure (if hasPrev then Just (prev playlists) else Nothing, playlists'', if hasNext then Just (next playlists) else Nothing)
     where
-        maxNumberOfTrackPerRequest :: Int
-        maxNumberOfTrackPerRequest = 100
+        mlast :: Vector a -> Maybe a
+        mlast v = if V.null v then Nothing else Just (V.last v)
 
-        getTracksUri :: NonEmpty BL.Builder -> Int -> URIRef Absolute
-        getTracksUri fields offset =
+        prev :: Vector (Int, S.PlaylistSimplified) -> PageRef
+        prev items =
+            let
+                pageRefOffset' = case pageRefDirection pageRef of
+                    Forward -> pageRefOffset pageRef
+                    Reverse -> maybe (pageRefOffset pageRef) fst (mlast items)
+            in
+                PageRef { pageRefDirection = Reverse, pageRefOffset = pageRefOffset', pageRefLimit = pageRefLimit pageRef }
+
+        next :: Vector (Int, S.PlaylistSimplified) -> PageRef
+        next items =
+            let
+                pageRefOffset' = case pageRefDirection pageRef of
+                    Forward -> maybe (pageRefOffset pageRef) ((+ 1) . fst) (mlast items)
+                    Reverse -> pageRefOffset pageRef
+            in
+                PageRef { pageRefDirection = Forward, pageRefOffset = pageRefOffset', pageRefLimit = pageRefLimit pageRef }
+
+        getPageItems :: ConduitT (Vector (Int, S.PlaylistSimplified)) o m (Vector (Int, S.PlaylistSimplified))
+        getPageItems = mconcat <$> (takeCE (pageRefLimit pageRef) .| sinkList)
+
+        playlistsBehind :: ConduitT () (Vector (Int, S.PlaylistSimplified)) m ()
+        playlistsBehind = playlistsSource (reverseDirection $ pageRefDirection pageRef) (pageRefOffset pageRef) pagingParams
+
+        playlistsAhead :: ConduitT () (Vector (Int, S.PlaylistSimplified)) m ()
+        playlistsAhead = playlistsSource (pageRefDirection pageRef) (pageRefOffset pageRef) pagingParams
+
+        pagingParams = 
+            S.SpotifyPagingParams
+                { S.sppLimit = 5
+                }
+
+playlistsSource :: (MonadIO m, MonadReader S.SpotifyClientContext m) => Direction -> Int -> S.SpotifyPagingParams -> ConduitT () (Vector (Int, S.PlaylistSimplified)) m ()
+playlistsSource = pagedItemsSource getItemsUri parseItem
+    where
+        getItemsUri :: Int -> Int -> URIRef Absolute
+        getItemsUri offset limit =
+            [uri|https://api.spotify.com/v1/me/playlists|]
+                & queryL .queryPairsL .~ 
+                    catMaybes
+                        [ (,) "offset" . BL.toByteString . intDec <$> Just offset
+                        , (,) "limit" . BL.toByteString . intDec <$> Just limit
+                        ]
+        parseItem :: Int -> J.Object -> J.Parser (Maybe (Int, S.PlaylistSimplified))
+        parseItem offset item = do
+            playlist <- parseJSON (J.Object item)
+            pure $ Just (offset, playlist)
+
+playlistTracksSource :: (MonadIO m, MonadReader S.SpotifyClientContext m) => PlaylistId -> S.SpotifyPagingParams -> ConduitT () (Vector Text) m ()
+playlistTracksSource playlistId = pagedItemsSource getItemsUri parseItem Forward 0
+    where
+        getItemsUri :: Int -> Int -> URIRef Absolute
+        getItemsUri offset limit =
             [uri|https://api.spotify.com/|]
                 & pathL .~ (encodeUtf8 $ "/v1/playlists/" <> S.unPlaylistId playlistId <> "/tracks")
                 & queryL .queryPairsL .~ 
-                    [ ( "fields"
-                        , BL.toByteString $ (NE.head fields) <> mconcat ["," <>  x  | x <- NE.tail fields]
-                        )
-                    , ( "offset"
-                        , BL.toByteString $ intDec offset
-                        )
-                    , ( "limit"
-                        , BL.toByteString $ intDec maxNumberOfTrackPerRequest
-                        )
-                    ]
+                    catMaybes
+                        [ (,) "fields" <$> Just "items(track(uri)),total"
+                        , (,) "offset" . BL.toByteString . intDec <$> Just offset
+                        , (,) "limit" . BL.toByteString . intDec <$> Just limit
+                        ]
 
-        requestTracks :: (MonadIO m, MonadReader S.SpotifyClientContext m) => NonEmpty BL.Builder -> Int -> m J.Object
-        requestTracks fields offset = do
-            let url = getTracksUri fields offset
+        parseItem :: Int -> J.Object -> J.Parser (Maybe Text)
+        parseItem _ item = do
+            track <- item .: "track"
+            Just <$> track .: "uri"
+
+pagedItemsSource :: forall m a. (MonadIO m, MonadReader S.SpotifyClientContext m) =>
+    (Int -> Int -> URIRef Absolute)
+    -> (Int -> J.Object -> J.Parser (Maybe a))
+    -> Direction
+    -> Int
+    -> S.SpotifyPagingParams
+    -> ConduitT () (Vector a) m ()
+pagedItemsSource getItemsUri parseItem direction startPos pagingParams = 
+        unfoldM (maybe (pure Nothing) getNextChunk) (Just startPos)
+    where
+        limit :: Int
+        limit = S.sppLimit pagingParams
+
+        requestItems :: Int -> Int -> m (Vector a, Int)
+        requestItems offset numItems = do
+            resp <- doRequest offset numItems 
+            parseResponse offset resp
+
+        doRequest :: Int -> Int -> m J.Object
+        doRequest offset numItems = do
+            let url = getItemsUri offset numItems
             resp <- asJSON' =<< get' (BS8.unpack $ serializeURIRef' url)
             return $ resp ^. responseBody
-        
-        getTracksFromResponse :: (MonadIO m) => J.Object -> m (Vector Text)
-        getTracksFromResponse resp = 
+
+        parseItems :: Int -> Vector J.Object -> J.Parser (Vector a)
+        parseItems offset items =
+            let
+                x = V.mapMaybe id <$> V.imapM (parseItem . (+ offset)) (items :: Vector J.Object)
+            in
+                case direction of
+                    Forward -> x
+                    Reverse -> V.reverse <$> x
+
+        parseResponse :: Int -> J.Object -> m (Vector a, Int)
+        parseResponse offset resp = do
             either throwString return $ do
                 flip J.parseEither resp $ \obj -> do
                     items <- obj .: "items"
-                    uris <- for (items :: Vector J.Object) $ \item -> do
-                        track <- item .: "track"
-                        track .: "uri" 
-                    return uris
+                    uris <- parseItems offset items
+                    total <- obj .: "total"
+                    return (uris, total)
+
+        getNextChunk :: Int -> m (Maybe (Vector a, Maybe Int))
+        getNextChunk offset = do
+            case direction of
+                Forward -> getNextChunkForward offset
+                Reverse -> getNextChunkReverse offset
+
+        getNextChunkForward :: Int -> m (Maybe (Vector a, Maybe Int))
+        getNextChunkForward offset = do
+            let offset' = (max 0 offset)
+            (items, total) <- requestItems offset' limit
+            pure $
+                if V.null items
+                    then Nothing
+                    else
+                        Just
+                            (   items
+                            ,   let
+                                    offset'' = offset' + limit
+                                in
+                                    if offset'' < total then Just offset'' else Nothing
+                            )
+
+        getNextChunkReverse :: Int -> m (Maybe (Vector a, Maybe Int))
+        getNextChunkReverse = attempt $ attempt $ const $ pure Nothing
+          where
+            attempt :: (Int -> m (Maybe (Vector a, Maybe Int))) -> Int -> m (Maybe (Vector a, Maybe Int))
+            attempt retry offset =
+                let
+                    offset' = max 0 (offset - limit)
+                    numItems = (offset - offset')
+                in
+                    if numItems <= 0
+                        then
+                            pure Nothing
+                        else do
+                            (items, total) <- requestItems offset' numItems
+                            if offset' < total
+                                then
+                                    pure $ Just $ (items, if offset' > 0 then Just offset' else Nothing)
+                                else
+                                    if total > 0
+                                        then
+                                            retry total
+                                        else
+                                            pure Nothing
+
 
 playlistTracksSink :: (MonadIO m, MonadReader S.SpotifyClientContext m, PrimMonad m) => PlaylistId -> ConduitT (Vector Text) Void m ()
 playlistTracksSink playlistId =
@@ -205,10 +309,15 @@ clonePlaylist params = do
 
     cpr <- createPlaylist (cppName params)
 
-    let source = playlistTracksSource (cppSourcePlayListId params)
+    let source = playlistTracksSource (cppSourcePlayListId params) pagingParams
     let sink = playlistTracksSink (cprId cpr)
     let pipeline = source .| sink
 
     runConduit pipeline
 
     return cpr
+  where
+    pagingParams = 
+        S.SpotifyPagingParams
+            { S.sppLimit = 100
+            }
