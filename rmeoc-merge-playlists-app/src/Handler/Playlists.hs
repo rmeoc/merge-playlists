@@ -7,10 +7,7 @@
 
 module Handler.Playlists(getPlaylistsR) where
 
-import Control.Applicative          ((<|>))
-import Control.Arrow                (second)
-import Control.Monad                ((<=<))
-import Control.Monad.Reader         (Reader, ReaderT(..), reader, runReader, runReaderT, withReaderT)
+import Control.Monad.Reader         (ReaderT(..), runReaderT, withReaderT)
 import Data.List                    (sortBy)
 import Data.Maybe                   (fromMaybe, listToMaybe)
 import Data.Ord                     (Down(..), comparing)
@@ -21,10 +18,8 @@ import UnliftIO                     (MonadUnliftIO)
 import Yesod.Core                   (HandlerSite, Html, MonadHandler, defaultLayout, getRequest,
                                      getYesod, liftIO, reqGetParams, whamlet)
 
-import qualified Data.Attoparsec.Text as P
-import qualified Data.Map as Map
-import qualified Data.Text as T
 import qualified Network.Wreq.Session as WS
+import qualified RequestParams
 import qualified SpotifyClient as S
 import qualified SpotifyClient.Types as S
 
@@ -97,12 +92,6 @@ getPlaylistsR = do
 fieldDirection :: Text
 fieldDirection = "direction"
 
-fieldDirectionForward :: Text
-fieldDirectionForward = "forward"
-
-fieldDirectionReverse :: Text
-fieldDirectionReverse = "reverse"
-
 fieldOffset :: Text
 fieldOffset = "offset"
 
@@ -110,39 +99,20 @@ fieldLimit :: Text
 fieldLimit = "limit"
 
 queryStringToPageRef :: [(Text,Text)] -> S.PageRef
-queryStringToPageRef = runReader (S.PageRef <$> direction <*> offset <*> limit) . Map.fromListWith (<>) . fmap (second pure)
+queryStringToPageRef = RequestParams.runParser (S.PageRef <$> direction <*> offset <*> limit)
     where
-        singletonItem :: [a] -> Maybe a
-        singletonItem [x] = Just x
-        singletonItem _ = Nothing
+        direction :: RequestParams.Parser S.Direction
+        direction = RequestParams.field fieldDirection RequestParams.parseDirection S.Forward
 
-        runParser :: P.Parser a -> Text -> Maybe a
-        runParser p = either (const Nothing) Just . P.parseOnly p
+        offset :: RequestParams.Parser Int
+        offset = RequestParams.field fieldOffset RequestParams.parseInt 0
 
-        parseDirection :: Text -> Maybe S.Direction
-        parseDirection =
-            runParser $ (S.Forward <$ P.string fieldDirectionForward <|> S.Reverse <$ P.string fieldDirectionReverse) <* P.endOfInput
-
-        parseInt :: Text -> Maybe Int
-        parseInt =
-            runParser $ P.signed P.decimal <* P.endOfInput
-
-        field :: Text -> (Text -> Maybe a) -> a -> Reader (Map.Map Text [Text]) a
-        field name parse def = reader $ fromMaybe def . (parse <=< singletonItem <=< Map.lookup name)
-
-        direction :: Reader (Map.Map Text [Text]) S.Direction
-        direction = field fieldDirection parseDirection S.Forward
-
-        offset :: Reader (Map.Map Text [Text]) Int
-        offset = field fieldOffset parseInt 0
-
-        limit :: Reader (Map.Map Text [Text]) Int
-        limit = field fieldLimit parseInt 10
-
+        limit :: RequestParams.Parser Int
+        limit = RequestParams.field fieldLimit RequestParams.parseInt 10
 
 pageRefToQueryString :: S.PageRef -> [(Text,Text)]
 pageRefToQueryString S.PageRef { S.pageRefDirection, S.pageRefOffset, S.pageRefLimit } =
-    [   (fieldDirection, case pageRefDirection of S.Forward -> fieldDirectionForward; S.Reverse -> fieldDirectionReverse)
-    ,   (fieldOffset, T.pack $ show pageRefOffset)
-    ,   (fieldLimit, T.pack $ show pageRefLimit)
+    [   (fieldDirection, RequestParams.printDirection pageRefDirection)
+    ,   (fieldOffset, RequestParams.printInt pageRefOffset)
+    ,   (fieldLimit, RequestParams.printInt pageRefLimit)
     ]
