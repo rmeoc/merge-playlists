@@ -102,13 +102,13 @@ queryStringToPageRef :: [(Text,Text)] -> S.PageRef
 queryStringToPageRef = RequestParams.runParser (S.PageRef <$> direction <*> offset <*> limit)
     where
         direction :: RequestParams.Parser S.Direction
-        direction = RequestParams.field fieldDirection RequestParams.parseDirection S.Forward
+        direction = RequestParams.field RequestParams.parseDirection fieldDirection S.Forward
 
         offset :: RequestParams.Parser Int
-        offset = RequestParams.field fieldOffset RequestParams.parseInt 0
+        offset = RequestParams.field RequestParams.parseInt fieldOffset 0
 
         limit :: RequestParams.Parser Int
-        limit = RequestParams.field fieldLimit RequestParams.parseInt 10
+        limit = RequestParams.field RequestParams.parseInt fieldLimit 10
 
 pageRefToQueryString :: S.PageRef -> [(Text,Text)]
 pageRefToQueryString S.PageRef { S.pageRefDirection, S.pageRefOffset, S.pageRefLimit } =

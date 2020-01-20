@@ -28,8 +28,8 @@ newtype Parser a = Parser (Reader (Map.Map Text [Text]) a) deriving (Applicative
 runParser :: RequestParams.Parser a -> [(Text,Text)] -> a
 runParser (Parser rdr) = runReader rdr . Map.fromListWith (<>) . fmap (second pure)
 
-field :: Text -> (Text -> Maybe a) -> a -> RequestParams.Parser a
-field name parseValue def = Parser $ reader $ fromMaybe def . (parseValue <=< singletonItem <=< Map.lookup name)
+field :: (Text -> Maybe a) -> Text -> a -> RequestParams.Parser a
+field parseValue name def = Parser $ reader $ fromMaybe def . (parseValue <=< singletonItem <=< Map.lookup name)
     where
         singletonItem :: [a] -> Maybe a
         singletonItem [x] = Just x
