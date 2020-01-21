@@ -13,7 +13,6 @@ module RequestParams
 
 import Control.Applicative
 import Control.Arrow
-import Control.Monad
 import Control.Monad.Reader
 import Data.Attoparsec.Text
 import Data.Either.Combinators
@@ -29,11 +28,10 @@ runParser :: RequestParams.Parser a -> [(Text,Text)] -> a
 runParser (Parser rdr) = runReader rdr . Map.fromListWith (<>) . fmap (second pure)
 
 field :: (Text -> Maybe a) -> Text -> a -> RequestParams.Parser a
-field parseValue name def = Parser $ reader $ fromMaybe def . (parseValue <=< singletonItem <=< Map.lookup name)
+field parseValue name def = Parser $ reader $ fromMaybe def . parseValues . Map.findWithDefault [] name
     where
-        singletonItem :: [a] -> Maybe a
-        singletonItem [x] = Just x
-        singletonItem _ = Nothing
+        parseValues [x] = parseValue x
+        parseValues _ = Nothing
 
 parseDirection :: Text -> Maybe SpotifyClient.Direction
 parseDirection =
