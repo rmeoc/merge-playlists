@@ -99,10 +99,10 @@ fieldLimit :: Text
 fieldLimit = "limit"
 
 pageRefParser :: RequestParams.Parser S.PageRef
-pageRefParser = S.PageRef <$> direction <*> offset <*> limit
+pageRefParser = S.PageRef <$> (toSpotifyClientDirection <$> direction) <*> offset <*> limit
     where
-        direction :: RequestParams.Parser S.Direction
-        direction = RequestParams.field RequestParams.parseDirection fieldDirection S.Forward
+        direction :: RequestParams.Parser RequestParams.Direction
+        direction = RequestParams.field RequestParams.parseDirection fieldDirection (RequestParams.Direction S.Forward)
 
         offset :: RequestParams.Parser Int
         offset = RequestParams.field RequestParams.parseInt fieldOffset 0
@@ -112,7 +112,7 @@ pageRefParser = S.PageRef <$> direction <*> offset <*> limit
 
 pageRefToQueryString :: S.PageRef -> [(Text,Text)]
 pageRefToQueryString S.PageRef { S.pageRefDirection, S.pageRefOffset, S.pageRefLimit } =
-    [   (fieldDirection, RequestParams.printDirection pageRefDirection)
+    [   (fieldDirection, RequestParams.printDirection $ Direction pageRefDirection)
     ,   (fieldOffset, RequestParams.printInt pageRefOffset)
     ,   (fieldLimit, RequestParams.printInt pageRefLimit)
     ]

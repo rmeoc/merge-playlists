@@ -2,7 +2,8 @@
 {-# LANGUAGE OverloadedStrings         #-}
 
 module RequestParams
-    ( RequestParams.Parser
+    ( RequestParams.Direction(..)
+    , RequestParams.Parser
     , field
     , parseDirection
     , parseInt
@@ -34,13 +35,15 @@ field parseValue name def = Parser $ reader $ fromMaybe def . parseValues . Map.
         parseValues [x] = parseValue x
         parseValues _ = Nothing
 
-parseDirection :: Text -> Maybe SpotifyClient.Direction
-parseDirection =
-    rightToMaybe . parseOnly ((SpotifyClient.Forward <$ string directionForwardText <|> SpotifyClient.Reverse <$ string directionReverseText) <* endOfInput)
+newtype Direction = Direction { toSpotifyClientDirection :: SpotifyClient.Direction }
 
-printDirection :: SpotifyClient.Direction -> Text
-printDirection SpotifyClient.Forward = directionForwardText
-printDirection SpotifyClient.Reverse = directionReverseText
+parseDirection :: Text -> Maybe RequestParams.Direction
+parseDirection =
+    fmap Direction . rightToMaybe . parseOnly ((SpotifyClient.Forward <$ string directionForwardText <|> SpotifyClient.Reverse <$ string directionReverseText) <* endOfInput)
+
+printDirection :: RequestParams.Direction -> Text
+printDirection (Direction SpotifyClient.Forward) = directionForwardText
+printDirection (Direction SpotifyClient.Reverse) = directionReverseText
 
 directionForwardText :: Text
 directionForwardText = "forward"
