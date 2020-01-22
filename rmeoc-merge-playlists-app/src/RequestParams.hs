@@ -8,7 +8,7 @@ module RequestParams
     , parseInt
     , printDirection
     , printInt
-    , runParser
+    , runParserGet
     ) where
 
 import Control.Applicative
@@ -20,6 +20,7 @@ import Data.Map as Map
 import Data.Maybe
 import Data.Text as Text
 import SpotifyClient
+import Yesod.Core
 
 
 newtype Parser a = Parser (Reader (Map.Map Text [Text]) a) deriving (Applicative, Functor)
@@ -53,3 +54,6 @@ parseInt =
 
 printInt :: Int -> Text
 printInt = Text.pack . show
+
+runParserGet :: MonadHandler m => RequestParams.Parser a -> m a
+runParserGet p = RequestParams.runParser p . reqGetParams <$> getRequest

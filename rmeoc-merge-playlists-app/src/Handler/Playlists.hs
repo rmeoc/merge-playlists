@@ -19,7 +19,7 @@ import Yesod.Core                   (HandlerSite, Html, MonadHandler, defaultLay
                                      getYesod, liftIO, reqGetParams, whamlet)
 
 import qualified Network.Wreq.Session as WS
-import qualified RequestParams
+import RequestParams
 import qualified SpotifyClient as S
 import qualified SpotifyClient.Types as S
 
@@ -32,7 +32,7 @@ runSpotify mx = do
 
 getPlaylistsR :: Handler Html
 getPlaylistsR = do
-        pageRef <- queryStringToPageRef . reqGetParams <$> getRequest
+        pageRef <- runParserGet pageRefParser
         wreqSession <- liftIO WS.newSession
         (mprev, playlists, mnext) <- runReaderT (runSpotify $ S.getPlaylistPage pageRef) wreqSession
 
@@ -98,8 +98,8 @@ fieldOffset = "offset"
 fieldLimit :: Text
 fieldLimit = "limit"
 
-queryStringToPageRef :: [(Text,Text)] -> S.PageRef
-queryStringToPageRef = RequestParams.runParser (S.PageRef <$> direction <*> offset <*> limit)
+pageRefParser :: RequestParams.Parser S.PageRef
+pageRefParser = S.PageRef <$> direction <*> offset <*> limit
     where
         direction :: RequestParams.Parser S.Direction
         direction = RequestParams.field RequestParams.parseDirection fieldDirection S.Forward
