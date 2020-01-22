@@ -37,6 +37,10 @@ field parseValue name def = Parser $ reader $ fromMaybe def . parseValues . Map.
 
 newtype Direction = Direction { toSpotifyClientDirection :: SpotifyClient.Direction }
 
+instance PathPiece RequestParams.Direction where
+    fromPathPiece = parseDirection
+    toPathPiece = printDirection
+
 parseDirection :: Text -> Maybe RequestParams.Direction
 parseDirection =
     fmap Direction . rightToMaybe . parseOnly ((SpotifyClient.Forward <$ string directionForwardText <|> SpotifyClient.Reverse <$ string directionReverseText) <* endOfInput)
