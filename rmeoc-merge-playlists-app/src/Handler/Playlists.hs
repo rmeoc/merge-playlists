@@ -15,8 +15,7 @@ import Data.Text                    (Text)
 import Foundation                   (App, Handler, Route(..), Widget, appSpotifyClientContext)
 import OAuth2Client                 (getAccessToken)
 import UnliftIO                     (MonadUnliftIO)
-import Yesod.Core                   (HandlerSite, Html, MonadHandler, defaultLayout, getRequest,
-                                     getYesod, liftIO, reqGetParams, whamlet)
+import Yesod.Core
 
 import qualified Network.Wreq.Session as WS
 import RequestParams
@@ -102,17 +101,17 @@ pageRefParser :: RequestParams.Parser S.PageRef
 pageRefParser = S.PageRef <$> (toSpotifyClientDirection <$> direction) <*> offset <*> limit
     where
         direction :: RequestParams.Parser RequestParams.Direction
-        direction = RequestParams.field RequestParams.parseDirection fieldDirection (RequestParams.Direction S.Forward)
+        direction = RequestParams.field fieldDirection (RequestParams.Direction S.Forward)
 
         offset :: RequestParams.Parser Int
-        offset = RequestParams.field RequestParams.parseInt fieldOffset 0
+        offset = RequestParams.field fieldOffset 0
 
         limit :: RequestParams.Parser Int
-        limit = RequestParams.field RequestParams.parseInt fieldLimit 10
+        limit = RequestParams.field fieldLimit 10
 
 pageRefToQueryString :: S.PageRef -> [(Text,Text)]
 pageRefToQueryString S.PageRef { S.pageRefDirection, S.pageRefOffset, S.pageRefLimit } =
-    [   (fieldDirection, RequestParams.printDirection $ Direction pageRefDirection)
-    ,   (fieldOffset, RequestParams.printInt pageRefOffset)
-    ,   (fieldLimit, RequestParams.printInt pageRefLimit)
+    [   (fieldDirection, toPathPiece $ Direction pageRefDirection)
+    ,   (fieldOffset, toPathPiece pageRefOffset)
+    ,   (fieldLimit, toPathPiece pageRefLimit)
     ]
