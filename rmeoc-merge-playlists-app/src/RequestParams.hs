@@ -1,5 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE OverloadedStrings         #-}
+{-# LANGUAGE OverloadedStrings          #-}
 
 module RequestParams
     ( RequestParams.Direction(..)
@@ -22,8 +22,8 @@ import Yesod.Core
 
 newtype Parser a = Parser (Reader (Map.Map Text [Text]) a) deriving (Applicative, Functor)
 
-runParser :: RequestParams.Parser a -> [(Text,Text)] -> a
-runParser (Parser rdr) = runReader rdr . Map.fromListWith (<>) . fmap (second pure)
+runParser :: RequestParams.Parser a -> [(Text,Text)] -> Either [Text] a
+runParser (Parser rdr) = Right . runReader rdr . Map.fromListWith (<>) . fmap (second pure)
 
 field :: PathPiece a => Text -> a -> RequestParams.Parser a
 field name def = Parser $ reader $ fromMaybe def . parseValues . Map.findWithDefault [] name
@@ -52,4 +52,7 @@ directionReverseText :: Text
 directionReverseText = "reverse"
 
 runParserGet :: MonadHandler m => RequestParams.Parser a -> m a
-runParserGet p = RequestParams.runParser p . reqGetParams <$> getRequest
+runParserGet p = do
+    request <- getRequest
+    let parseResult = RequestParams.runParser p $ reqGetParams request
+    either invalidArgs pure parseResult
