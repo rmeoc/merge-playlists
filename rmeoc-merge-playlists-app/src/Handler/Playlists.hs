@@ -101,13 +101,13 @@ pageRefParser :: RequestParams.Parser S.PageRef
 pageRefParser = S.PageRef <$> (toSpotifyClientDirection <$> direction) <*> offset <*> limit
     where
         direction :: RequestParams.Parser RequestParams.Direction
-        direction = RequestParams.field fieldDirection (RequestParams.Direction S.Forward)
+        direction = RequestParams.field fieldDirection (Just $ RequestParams.Direction S.Forward)
 
         offset :: RequestParams.Parser Int
-        offset = RequestParams.field fieldOffset 0
+        offset = RequestParams.field fieldOffset (Just 0)
 
         limit :: RequestParams.Parser Int
-        limit = RequestParams.field fieldLimit 10
+        limit = RequestParams.field fieldLimit (Just 10)
 
 pageRefToQueryString :: S.PageRef -> [(Text,Text)]
 pageRefToQueryString S.PageRef { S.pageRefDirection, S.pageRefOffset, S.pageRefLimit } =

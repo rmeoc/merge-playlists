@@ -14,22 +14,22 @@ import Control.Monad.Reader
 import Data.Attoparsec.Text
 import Data.Either.Combinators
 import Data.Map as Map
-import Data.Maybe
 import Data.Text as Text
 import SpotifyClient
 import Yesod.Core
 
 
-newtype Parser a = Parser (Reader (Map.Map Text [Text]) a) deriving (Applicative, Functor)
+newtype Parser a = Parser (ReaderT (Map.Map Text [Text]) (Either [Text]) a) deriving (Applicative, Functor)
 
 runParser :: RequestParams.Parser a -> [(Text,Text)] -> Either [Text] a
-runParser (Parser rdr) = Right . runReader rdr . Map.fromListWith (<>) . fmap (second pure)
+runParser (Parser rdr) = runReaderT rdr . Map.fromListWith (<>) . fmap (second pure)
 
-field :: PathPiece a => Text -> a -> RequestParams.Parser a
-field name def = Parser $ reader $ fromMaybe def . parseValues . Map.findWithDefault [] name
+field :: PathPiece a => Text -> Maybe a -> RequestParams.Parser a
+field name mdef = Parser $ ReaderT $ left (\err -> ["Failed to parse \"" <> name <> "\": " <> err]) . parseValues . Map.findWithDefault [] name
     where
-        parseValues [x] = fromPathPiece x
-        parseValues _ = Nothing
+        parseValues [] = maybe (Left "missing value") Right mdef
+        parseValues [x] = maybe (Left $ "invalid value: " <> x) Right $ fromPathPiece x
+        parseValues xs = Left ("multiple values: " <> intercalate ", " xs)
 
 newtype Direction = Direction { toSpotifyClientDirection :: SpotifyClient.Direction }
 
