@@ -1,3 +1,4 @@
+{-# LANGUAGE ExistentialQuantification  #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 
@@ -9,6 +10,7 @@ module RequestParams
     ) where
 
 import Control.Applicative
+import Control.Applicative.Free
 import Control.Arrow
 import Control.Monad.Reader
 import Data.Attoparsec.Text
@@ -18,18 +20,28 @@ import Data.Text as Text
 import SpotifyClient
 import Yesod.Core
 
+data ParserF a = PathPiece a => ParserF Text (Maybe a)
 
-newtype Parser a = Parser (ReaderT (Map.Map Text [Text]) (Either [Text]) a) deriving (Applicative, Functor)
+type Parser a = Ap ParserF a
 
 runParser :: RequestParams.Parser a -> [(Text,Text)] -> Either [Text] a
-runParser (Parser rdr) = runReaderT rdr . Map.fromListWith (<>) . fmap (second pure)
+runParser p params = runReaderT (runAp toReader p) paramsMap
+    where
+        paramsMap :: Map.Map Text [Text]
+        paramsMap = Map.fromListWith (<>) $ fmap (second pure) params
+
+        toReader :: RequestParams.ParserF a -> ReaderT (Map.Map Text [Text]) (Either [Text]) a
+        toReader (ParserF name mdef) = ReaderT $ left adjustError . parseValues . Map.findWithDefault [] name
+            where
+                adjustError :: Text -> [Text]
+                adjustError err = ["Failed to parse \"" <> name <> "\": " <> err]
+
+                parseValues [] = maybe (Left "missing value") Right mdef
+                parseValues [x] = maybe (Left $ "invalid value: " <> x) Right $ fromPathPiece x
+                parseValues xs = Left ("multiple values: " <> intercalate ", " xs)
 
 field :: PathPiece a => Text -> Maybe a -> RequestParams.Parser a
-field name mdef = Parser $ ReaderT $ left (\err -> ["Failed to parse \"" <> name <> "\": " <> err]) . parseValues . Map.findWithDefault [] name
-    where
-        parseValues [] = maybe (Left "missing value") Right mdef
-        parseValues [x] = maybe (Left $ "invalid value: " <> x) Right $ fromPathPiece x
-        parseValues xs = Left ("multiple values: " <> intercalate ", " xs)
+field name mdef = liftAp $ ParserF name mdef
 
 newtype Direction = Direction { toSpotifyClientDirection :: SpotifyClient.Direction }
 

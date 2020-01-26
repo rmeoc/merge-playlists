@@ -45,6 +45,7 @@ dependencies:
 - attoparsec
 - clientsession
 - either
+- free
 - hoauth2
 - jose
 - lens
