@@ -89,30 +89,30 @@ getPlaylistsR = do
                             <li> owner: #{fromMaybe (usepubId owner) (usepubDisplayName owner)}
             |]
 
-fieldDirection :: Text
-fieldDirection = "direction"
+fieldNameDirection :: Text
+fieldNameDirection = "direction"
 
-fieldOffset :: Text
-fieldOffset = "offset"
+fieldNameOffset :: Text
+fieldNameOffset = "offset"
 
-fieldLimit :: Text
-fieldLimit = "limit"
+fieldNameLimit :: Text
+fieldNameLimit = "limit"
 
 pageRefFormSpec :: FormSpec PageRef
 pageRefFormSpec = PageRef <$> (toSpotifyClientDirection <$> direction) <*> offset <*> limit
     where
         direction :: FormSpec Direction
-        direction = RequestParams.field fieldDirection (Just $ Direction Forward)
+        direction = field fieldNameDirection (Just $ Direction Forward)
 
         offset :: FormSpec Int
-        offset = RequestParams.field fieldOffset (Just 0)
+        offset = field fieldNameOffset (Just 0)
 
         limit :: FormSpec Int
-        limit = RequestParams.field fieldLimit (Just 10)
+        limit = field fieldNameLimit (Just 10)
 
 pageRefToQueryString :: PageRef -> [(Text,Text)]
 pageRefToQueryString PageRef { pageRefDirection, pageRefOffset, pageRefLimit } =
-    [   (fieldDirection, toPathPiece $ Direction pageRefDirection)
-    ,   (fieldOffset, toPathPiece pageRefOffset)
-    ,   (fieldLimit, toPathPiece pageRefLimit)
+    [   (fieldNameDirection, toPathPiece $ Direction pageRefDirection)
+    ,   (fieldNameOffset, toPathPiece pageRefOffset)
+    ,   (fieldNameLimit, toPathPiece pageRefLimit)
     ]
