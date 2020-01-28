@@ -32,7 +32,7 @@ runSpotify mx = do
 
 getPlaylistsR :: Handler Html
 getPlaylistsR = do
-        pageRef <- runParserGet pageRefParser
+        pageRef <- parseFormGet pageRefFormSpec
         wreqSession <- liftIO newSession
         (mprev, playlists, mnext) <- runReaderT (runSpotify $ getPlaylistPage pageRef) wreqSession
 
@@ -98,16 +98,16 @@ fieldOffset = "offset"
 fieldLimit :: Text
 fieldLimit = "limit"
 
-pageRefParser :: RequestParams.Parser PageRef
-pageRefParser = PageRef <$> (toSpotifyClientDirection <$> direction) <*> offset <*> limit
+pageRefFormSpec :: FormSpec PageRef
+pageRefFormSpec = PageRef <$> (toSpotifyClientDirection <$> direction) <*> offset <*> limit
     where
-        direction :: RequestParams.Parser Direction
+        direction :: FormSpec Direction
         direction = RequestParams.field fieldDirection (Just $ Direction Forward)
 
-        offset :: RequestParams.Parser Int
+        offset :: FormSpec Int
         offset = RequestParams.field fieldOffset (Just 0)
 
-        limit :: RequestParams.Parser Int
+        limit :: FormSpec Int
         limit = RequestParams.field fieldLimit (Just 10)
 
 pageRefToQueryString :: PageRef -> [(Text,Text)]

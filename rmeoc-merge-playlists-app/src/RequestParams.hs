@@ -3,9 +3,9 @@
 {-# LANGUAGE OverloadedStrings          #-}
 
 module RequestParams
-    ( RequestParams.Parser
+    ( FormSpec
     , field
-    , runParserGet
+    , parseFormGet
     ) where
 
 import Control.Applicative.Free
@@ -16,18 +16,18 @@ import Data.Text
 import Yesod.Core
 
 
-data ParserF a = PathPiece a => ParserF Text (Maybe a)
+data FormSpecF a = PathPiece a => FormSpecF Text (Maybe a)
 
-type Parser a = Ap ParserF a
+type FormSpec a = Ap FormSpecF a
 
-runParser :: RequestParams.Parser a -> [(Text,Text)] -> Either [Text] a
-runParser p params = runReaderT (runAp toReader p) paramsMap
+parseForm :: FormSpec a -> [(Text,Text)] -> Either [Text] a
+parseForm p params = runReaderT (runAp toReader p) paramsMap
     where
         paramsMap :: Map Text [Text]
         paramsMap = Map.fromListWith (<>) $ fmap (second pure) params
 
-        toReader :: RequestParams.ParserF a -> ReaderT (Map Text [Text]) (Either [Text]) a
-        toReader (ParserF name mdef) = ReaderT $ left adjustError . parseValues . Map.findWithDefault [] name
+        toReader :: FormSpecF a -> ReaderT (Map Text [Text]) (Either [Text]) a
+        toReader (FormSpecF name mdef) = ReaderT $ left adjustError . parseValues . Map.findWithDefault [] name
             where
                 adjustError :: Text -> [Text]
                 adjustError err = ["Failed to parse \"" <> name <> "\": " <> err]
@@ -36,11 +36,11 @@ runParser p params = runReaderT (runAp toReader p) paramsMap
                 parseValues [x] = maybe (Left $ "invalid value: " <> x) Right $ fromPathPiece x
                 parseValues xs = Left ("multiple values: " <> intercalate ", " xs)
 
-field :: PathPiece a => Text -> Maybe a -> RequestParams.Parser a
-field name mdef = liftAp $ ParserF name mdef
+field :: PathPiece a => Text -> Maybe a -> FormSpec a
+field name mdef = liftAp $ FormSpecF name mdef
 
-runParserGet :: MonadHandler m => RequestParams.Parser a -> m a
-runParserGet p = do
+parseFormGet :: MonadHandler m => FormSpec a -> m a
+parseFormGet p = do
     request <- getRequest
-    let parseResult = RequestParams.runParser p $ reqGetParams request
+    let parseResult = parseForm p $ reqGetParams request
     either invalidArgs pure parseResult
