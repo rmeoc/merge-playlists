@@ -32,7 +32,7 @@ runSpotify mx = do
 
 getPlaylistsR :: Handler Html
 getPlaylistsR = do
-        pageRef <- parseFormGet pageRefFormSpec
+        pageRef <- parseGetParams pageRefRequestParamsSpec
         wreqSession <- liftIO newSession
         (mprev, playlists, mnext) <- runReaderT (runSpotify $ getPlaylistPage pageRef) wreqSession
 
@@ -41,20 +41,17 @@ getPlaylistsR = do
                 <h1>Playlists
                 $maybe prev <- mprev
                     <p>
-                        <a href=@?{playlistsPageRoute prev}>
+                        <a href=@?{(PlaylistsR, pageRefRequestParams prev)}>
                             Previous Page
                 $maybe next <- mnext
                     <p>
-                        <a href=@?{playlistsPageRoute next}>
+                        <a href=@?{(PlaylistsR, pageRefRequestParams next)}>
                             Next Page
                 <ul>
                     $forall playlist <- playlists
                         ^{playlistWidget playlist}
             |]
     where
-        playlistsPageRoute :: PageRef -> (Route App, [(Text, Text)])
-        playlistsPageRoute pageRef = (PlaylistsR, pageRefToQueryString pageRef)
-
         chooseImage :: PlaylistSimplified -> Maybe Image
         chooseImage = listToMaybe . sortBy compareImages . plasimImages
 
@@ -89,30 +86,30 @@ getPlaylistsR = do
                             <li> owner: #{fromMaybe (usepubId owner) (usepubDisplayName owner)}
             |]
 
-fieldNameDirection :: Text
-fieldNameDirection = "direction"
+requestParamNameDirection :: Text
+requestParamNameDirection = "direction"
 
-fieldNameOffset :: Text
-fieldNameOffset = "offset"
+requestParamNameOffset :: Text
+requestParamNameOffset = "offset"
 
-fieldNameLimit :: Text
-fieldNameLimit = "limit"
+requestParamNameLimit :: Text
+requestParamNameLimit = "limit"
 
-pageRefFormSpec :: FormSpec PageRef
-pageRefFormSpec = PageRef <$> (toSpotifyClientDirection <$> direction) <*> offset <*> limit
+pageRefRequestParamsSpec :: RequestParamsSpec PageRef
+pageRefRequestParamsSpec = PageRef <$> (toSpotifyClientDirection <$> direction) <*> offset <*> limit
     where
-        direction :: FormSpec Direction
-        direction = field fieldNameDirection (Just $ Direction Forward)
+        direction :: RequestParamsSpec Direction
+        direction = requestParamSpec requestParamNameDirection (Just $ Direction Forward)
 
-        offset :: FormSpec Int
-        offset = field fieldNameOffset (Just 0)
+        offset :: RequestParamsSpec Int
+        offset = requestParamSpec requestParamNameOffset (Just 0)
 
-        limit :: FormSpec Int
-        limit = field fieldNameLimit (Just 10)
+        limit :: RequestParamsSpec Int
+        limit = requestParamSpec requestParamNameLimit (Just 10)
 
-pageRefToQueryString :: PageRef -> [(Text,Text)]
-pageRefToQueryString PageRef { pageRefDirection, pageRefOffset, pageRefLimit } =
-    [   (fieldNameDirection, toPathPiece $ Direction pageRefDirection)
-    ,   (fieldNameOffset, toPathPiece pageRefOffset)
-    ,   (fieldNameLimit, toPathPiece pageRefLimit)
+pageRefRequestParams :: PageRef -> [(Text,Text)]
+pageRefRequestParams PageRef { pageRefDirection, pageRefOffset, pageRefLimit } =
+    [   (requestParamNameDirection, toPathPiece $ Direction pageRefDirection)
+    ,   (requestParamNameOffset, toPathPiece pageRefOffset)
+    ,   (requestParamNameLimit, toPathPiece pageRefLimit)
     ]
