@@ -19,8 +19,8 @@ import SpotifyClient.Types
 import UnliftIO hiding (Handler)
 import Yesod.Core
 
-import Direction
 import Foundation
+import Handler.Shared
 import RequestParams
 
 
@@ -49,7 +49,7 @@ getPlaylistsR = do
                             Next Page
                 <ul>
                     $forall playlist <- playlists
-                        ^{playlistWidget playlist}
+                        ^{playlistWidget playlist pageRef}
             |]
     where
         chooseImage :: PlaylistSimplified -> Maybe Image
@@ -73,43 +73,20 @@ getPlaylistsR = do
                 preferredImageWidth :: Integer
                 preferredImageWidth = 300
         
-        playlistWidget :: PlaylistSimplified -> Widget
-        playlistWidget playlist = do
-            [whamlet|
-                $with owner <- plasimOwner playlist
-                    <li>
-                        #{plasimName playlist}
-                        <ul>
-                            $maybe image <- chooseImage playlist
-                                <li>
-                                    <img src=#{imaUrl image}>
-                            <li> owner: #{fromMaybe (usepubId owner) (usepubDisplayName owner)}
-            |]
-
-requestParamNameDirection :: Text
-requestParamNameDirection = "direction"
-
-requestParamNameOffset :: Text
-requestParamNameOffset = "offset"
-
-requestParamNameLimit :: Text
-requestParamNameLimit = "limit"
-
-pageRefRequestParamsSpec :: RequestParamsSpec PageRef
-pageRefRequestParamsSpec = PageRef <$> (toSpotifyClientDirection <$> direction) <*> offset <*> limit
-    where
-        direction :: RequestParamsSpec Direction
-        direction = requestParamSpec requestParamNameDirection (Just $ Direction Forward)
-
-        offset :: RequestParamsSpec Int
-        offset = requestParamSpec requestParamNameOffset (Just 0)
-
-        limit :: RequestParamsSpec Int
-        limit = requestParamSpec requestParamNameLimit (Just 10)
-
-pageRefRequestParams :: PageRef -> [(Text,Text)]
-pageRefRequestParams PageRef { pageRefDirection, pageRefOffset, pageRefLimit } =
-    [   (requestParamNameDirection, toPathPiece $ Direction pageRefDirection)
-    ,   (requestParamNameOffset, toPathPiece pageRefOffset)
-    ,   (requestParamNameLimit, toPathPiece pageRefLimit)
-    ]
+        playlistWidget :: PlaylistSimplified -> PageRef-> Widget
+        playlistWidget playlist pageRef = do
+                [whamlet|
+                    $with owner <- plasimOwner playlist
+                        <li>
+                            #{plasimName playlist}
+                            <ul>
+                                $maybe image <- chooseImage playlist
+                                    <li>
+                                        <img src=#{imaUrl image}>
+                                <li> owner: #{fromMaybe (usepubId owner) (usepubDisplayName owner)}
+                            ^{selectionButton SelectionAddR "Add to Selection"}
+                            ^{selectionButton SelectionRemoveR "Remove from Selection"}
+                |]
+            where
+                selectionButton :: Route App -> Text -> WidgetFor App ()
+                selectionButton route text = postButton route (selectionRequestParams $ SelectionParams (plasimId playlist) pageRef) text

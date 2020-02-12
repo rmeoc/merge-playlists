@@ -12,5 +12,7 @@
 
 /                           HomeR                   GET
 /playlists                  PlaylistsR              GET
+/selection/add              SelectionAddR           POST
+/selection/remove           SelectionRemoveR        POST
 
 /profile                    ProfileR                GET

@@ -5,3 +5,8 @@ User
     ident Text
     UniqueUser ident
     deriving Typeable
+
+PlaylistSelection
+    user UserId
+    playlist Text
+    Primary user playlist
