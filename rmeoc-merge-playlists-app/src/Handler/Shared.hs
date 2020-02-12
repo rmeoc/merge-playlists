@@ -2,9 +2,10 @@
 {-# LANGUAGE OverloadedStrings         #-}
 
 module Handler.Shared
-    ( SelectionParams(..)
-    , pageRefRequestParams
-    , pageRefRequestParamsSpec
+    ( PlaylistPageParams(..)
+    , SelectionParams(..)
+    , playlistPageRequestParamsSpec
+    , playlistPageRequestParams
     , selectionRequestParams
     , selectionRequestParamsSpec
     ) where
@@ -29,6 +30,9 @@ requestParamNameLimit = "limit"
 requestParamNamePlaylistId :: Text
 requestParamNamePlaylistId = "playlist-id"
 
+requestParamNameOnlySelected :: Text
+requestParamNameOnlySelected = "only-selected"
+
 pageRefRequestParamsSpec :: RequestParamsSpec PageRef
 pageRefRequestParamsSpec = PageRef <$> (toSpotifyClientDirection <$> direction) <*> offset <*> limit
     where
@@ -48,14 +52,26 @@ pageRefRequestParams PageRef { pageRefDirection, pageRefOffset, pageRefLimit } =
     ,   (requestParamNameLimit, toPathPiece pageRefLimit)
     ]
 
-data SelectionParams = SelectionParams { selectionParamsPlaylistId :: PlaylistId, selectionParamsReturnToPage :: PageRef }
+data PlaylistPageParams = PlaylistPageParams { playlistPageParamsPageRef :: PageRef, playlistPageParamsOnlySelected :: Bool }
+
+playlistPageRequestParamsSpec :: RequestParamsSpec PlaylistPageParams
+playlistPageRequestParamsSpec = PlaylistPageParams <$> pageRefRequestParamsSpec <*> onlySelected
+    where
+        onlySelected :: RequestParamsSpec Bool
+        onlySelected = requestParamSpec requestParamNameOnlySelected (Just False)
+
+playlistPageRequestParams :: PlaylistPageParams -> [(Text,Text)]
+playlistPageRequestParams PlaylistPageParams { playlistPageParamsPageRef, playlistPageParamsOnlySelected }
+    = (requestParamNameOnlySelected, toPathPiece playlistPageParamsOnlySelected) : pageRefRequestParams playlistPageParamsPageRef
+
+data SelectionParams = SelectionParams { selectionParamsPlaylistId :: PlaylistId, selectionParamsReturnToPage :: PlaylistPageParams }
 
 selectionRequestParamsSpec :: RequestParamsSpec SelectionParams
-selectionRequestParamsSpec = SelectionParams <$> playlistId <*> pageRefRequestParamsSpec
+selectionRequestParamsSpec = SelectionParams <$> playlistId <*> playlistPageRequestParamsSpec
     where
         playlistId :: RequestParamsSpec PlaylistId
         playlistId = requestParamSpec requestParamNamePlaylistId Nothing
 
 selectionRequestParams :: SelectionParams -> [(Text,Text)]
 selectionRequestParams SelectionParams { selectionParamsPlaylistId, selectionParamsReturnToPage } =
-    (requestParamNamePlaylistId, toPathPiece selectionParamsPlaylistId) : pageRefRequestParams selectionParamsReturnToPage
+    (requestParamNamePlaylistId, toPathPiece selectionParamsPlaylistId) : playlistPageRequestParams selectionParamsReturnToPage

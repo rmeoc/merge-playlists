@@ -32,25 +32,38 @@ runSpotify mx = do
 
 getPlaylistsR :: Handler Html
 getPlaylistsR = do
-        pageRef <- parseGetParams pageRefRequestParamsSpec
-        wreqSession <- liftIO newSession
+        playlistPageParams <- parseGetParams playlistPageRequestParamsSpec
+
+        let onlySelected = playlistPageParamsOnlySelected playlistPageParams
         selectedPlaylists <- getSelectedPlaylists
-        (mprev, playlists, mnext) <- runReaderT (runSpotify $ getPlaylistPage pageRef) wreqSession
+        let filterPredicate = case onlySelected of
+                False -> const True
+                True -> \playlist -> plasimId playlist `member` selectedPlaylists
+
+        let pageRef = playlistPageParamsPageRef playlistPageParams
+        wreqSession <- liftIO newSession
+        (mprev, playlists, mnext) <- runReaderT (runSpotify $ getPlaylistPage filterPredicate pageRef) wreqSession
 
         defaultLayout $ 
             [whamlet|
                 <h1>Playlists
+                <p>
+                    <a href=@?{(PlaylistsR, playlistPageRequestParams $ PlaylistPageParams pageRef (not onlySelected))}>
+                        $if onlySelected
+                            Display All
+                        $else
+                            Only Display Selected
                 $maybe prev <- mprev
                     <p>
-                        <a href=@?{(PlaylistsR, pageRefRequestParams prev)}>
+                        <a href=@?{(PlaylistsR, playlistPageRequestParams $ PlaylistPageParams prev onlySelected)}>
                             Previous Page
                 $maybe next <- mnext
                     <p>
-                        <a href=@?{(PlaylistsR, pageRefRequestParams next)}>
+                        <a href=@?{(PlaylistsR, playlistPageRequestParams $ PlaylistPageParams next onlySelected)}>
                             Next Page
                 <ul>
                     $forall playlist <- playlists
-                        ^{playlistWidget playlist pageRef selectedPlaylists}
+                        ^{playlistWidget playlist playlistPageParams selectedPlaylists}
             |]
     where
         chooseImage :: PlaylistSimplified -> Maybe Image
@@ -74,8 +87,8 @@ getPlaylistsR = do
                 preferredImageWidth :: Integer
                 preferredImageWidth = 300
         
-        playlistWidget :: PlaylistSimplified -> PageRef-> Set PlaylistId -> Widget
-        playlistWidget playlist pageRef selectedPlaylists = do
+        playlistWidget :: PlaylistSimplified -> PlaylistPageParams-> Set PlaylistId -> Widget
+        playlistWidget playlist playlistPageParams selectedPlaylists = do
                 [whamlet|
                     $with owner <- plasimOwner playlist
                         <li>
@@ -95,7 +108,7 @@ getPlaylistsR = do
                 isSelected = plasimId playlist `member` selectedPlaylists
 
                 selectionButton :: Route App -> Text -> WidgetFor App ()
-                selectionButton route text = postButton route (selectionRequestParams $ SelectionParams (plasimId playlist) pageRef) text
+                selectionButton route text = postButton route (selectionRequestParams $ SelectionParams (plasimId playlist) playlistPageParams) text
 
 
 getSelectedPlaylists :: Handler (Set PlaylistId)

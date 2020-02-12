@@ -102,8 +102,8 @@ reverseDirection :: Direction -> Direction
 reverseDirection Reverse = Forward
 reverseDirection Forward = Reverse
 
-getPlaylistPage :: forall m. (MonadIO m, MonadReader S.SpotifyClientContext m) => PageRef -> m (Maybe PageRef, Vector S.PlaylistSimplified, Maybe PageRef)
-getPlaylistPage pageRef = runConduit $ do
+getPlaylistPage :: forall m. (MonadIO m, MonadReader S.SpotifyClientContext m) => (S.PlaylistSimplified -> Bool) -> PageRef -> m (Maybe PageRef, Vector S.PlaylistSimplified, Maybe PageRef)
+getPlaylistPage filterPredicate pageRef = runConduit $ do
         hasBefore <- playlistsBehind .| not <$> nullCE
         (playlists, hasAfter) <- playlistsAhead .| ((,) <$> getPageItems <*> (not <$> nullCE))
         let
@@ -141,18 +141,18 @@ getPlaylistPage pageRef = runConduit $ do
         getPageItems = mconcat <$> (takeCE (pageRefLimit pageRef) .| sinkList)
 
         playlistsBehind :: ConduitT () (Vector (Int, S.PlaylistSimplified)) m ()
-        playlistsBehind = playlistsSource (reverseDirection $ pageRefDirection pageRef) (pageRefOffset pageRef) pagingParams
+        playlistsBehind = playlistsSource filterPredicate (reverseDirection $ pageRefDirection pageRef) (pageRefOffset pageRef) pagingParams
 
         playlistsAhead :: ConduitT () (Vector (Int, S.PlaylistSimplified)) m ()
-        playlistsAhead = playlistsSource (pageRefDirection pageRef) (pageRefOffset pageRef) pagingParams
+        playlistsAhead = playlistsSource filterPredicate (pageRefDirection pageRef) (pageRefOffset pageRef) pagingParams
 
         pagingParams = 
             S.SpotifyPagingParams
                 { S.sppLimit = 5
                 }
 
-playlistsSource :: (MonadIO m, MonadReader S.SpotifyClientContext m) => Direction -> Int -> S.SpotifyPagingParams -> ConduitT () (Vector (Int, S.PlaylistSimplified)) m ()
-playlistsSource = pagedItemsSource getItemsUri parseItem
+playlistsSource :: (MonadIO m, MonadReader S.SpotifyClientContext m) => (S.PlaylistSimplified -> Bool) -> Direction -> Int -> S.SpotifyPagingParams -> ConduitT () (Vector (Int, S.PlaylistSimplified)) m ()
+playlistsSource filterPredicate = pagedItemsSource getItemsUri parseItem
     where
         getItemsUri :: Int -> Int -> URIRef Absolute
         getItemsUri offset limit =
@@ -165,7 +165,7 @@ playlistsSource = pagedItemsSource getItemsUri parseItem
         parseItem :: Int -> J.Object -> J.Parser (Maybe (Int, S.PlaylistSimplified))
         parseItem offset item = do
             playlist <- parseJSON (J.Object item)
-            pure $ Just (offset, playlist)
+            pure $ if filterPredicate playlist then Just (offset, playlist) else Nothing
 
 playlistTracksSource :: (MonadIO m, MonadReader S.SpotifyClientContext m) => PlaylistId -> S.SpotifyPagingParams -> ConduitT () (Vector Text) m ()
 playlistTracksSource playlistId = pagedItemsSource getItemsUri parseItem Forward 0
