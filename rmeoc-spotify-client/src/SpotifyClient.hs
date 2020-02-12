@@ -239,7 +239,7 @@ pagedItemsSource getItemsUri parseItem direction startPos pagingParams =
             let offset' = (max 0 offset)
             (items, total) <- requestItems offset' limit
             pure $
-                if V.null items
+                if offset' >= total
                     then Nothing
                     else
                         Just
@@ -247,33 +247,23 @@ pagedItemsSource getItemsUri parseItem direction startPos pagingParams =
                             ,   let
                                     offset'' = offset' + limit
                                 in
-                                    if offset'' < total then Just offset'' else Nothing
+                                    if offset'' >= total
+                                        then Nothing
+                                        else Just offset''
                             )
 
         getNextChunkReverse :: Int -> m (Maybe (Vector a, Maybe Int))
-        getNextChunkReverse = attempt $ attempt $ const $ pure Nothing
-          where
-            attempt :: (Int -> m (Maybe (Vector a, Maybe Int))) -> Int -> m (Maybe (Vector a, Maybe Int))
-            attempt retry offset =
-                let
-                    offset' = max 0 (offset - limit)
-                    numItems = (offset - offset')
-                in
-                    if numItems <= 0
-                        then
-                            pure Nothing
-                        else do
-                            (items, total) <- requestItems offset' numItems
-                            if offset' < total
-                                then
-                                    pure $ Just $ (items, if offset' > 0 then Just offset' else Nothing)
-                                else
-                                    if total > 0
-                                        then
-                                            retry total
-                                        else
-                                            pure Nothing
-
+        getNextChunkReverse offset = 
+            let
+                offset' = max 0 (offset - limit)
+                numItems = (offset - offset')
+            in
+                if numItems <= 0
+                    then
+                        pure Nothing
+                    else do
+                        (items, total) <- requestItems offset' numItems
+                        pure $ Just (items, Just $ min total offset')
 
 playlistTracksSink :: (MonadIO m, MonadReader S.SpotifyClientContext m, PrimMonad m) => PlaylistId -> ConduitT (Vector Text) Void m ()
 playlistTracksSink playlistId =
