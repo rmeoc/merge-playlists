@@ -41,7 +41,7 @@ data SpotifyPagingParams = SpotifyPagingParams
     { sppLimit :: Int
     }
 
-newtype PlaylistId = PlaylistId { unPlaylistId :: Text } deriving (Eq, FromJSON, PathPiece, Read, Show)
+newtype PlaylistId = PlaylistId { unPlaylistId :: Text } deriving (Eq, FromJSON, Ord, PathPiece, Read, Show)
 
 data AlbumSimplified = AlbumSimplified
     { albsimAlbumGroup :: Maybe Text

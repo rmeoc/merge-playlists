@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts          #-}
 {-# LANGUAGE NamedFieldPuns            #-}
+{-# LANGUAGE NoImplicitPrelude         #-}
 {-# LANGUAGE OverloadedStrings         #-}
 {-# LANGUAGE QuasiQuotes               #-}
 {-# LANGUAGE TemplateHaskell           #-}
@@ -7,20 +8,19 @@
 
 module Handler.Playlists(getPlaylistsR) where
 
+import Conduit
 import Control.Monad.Reader
-import Data.List
 import Data.Maybe
 import Data.Ord
-import Data.Text
+import Data.Text hiding (singleton)
 import Network.Wreq.Session
 import OAuth2Client
 import SpotifyClient hiding (Direction)
 import SpotifyClient.Types
-import UnliftIO hiding (Handler)
 import Yesod.Core
 
-import Foundation
 import Handler.Shared
+import Import
 import RequestParams
 
 
@@ -34,6 +34,7 @@ getPlaylistsR :: Handler Html
 getPlaylistsR = do
         pageRef <- parseGetParams pageRefRequestParamsSpec
         wreqSession <- liftIO newSession
+        selectedPlaylists <- getSelectedPlaylists
         (mprev, playlists, mnext) <- runReaderT (runSpotify $ getPlaylistPage pageRef) wreqSession
 
         defaultLayout $ 
@@ -49,7 +50,7 @@ getPlaylistsR = do
                             Next Page
                 <ul>
                     $forall playlist <- playlists
-                        ^{playlistWidget playlist pageRef}
+                        ^{playlistWidget playlist pageRef selectedPlaylists}
             |]
     where
         chooseImage :: PlaylistSimplified -> Maybe Image
@@ -73,8 +74,8 @@ getPlaylistsR = do
                 preferredImageWidth :: Integer
                 preferredImageWidth = 300
         
-        playlistWidget :: PlaylistSimplified -> PageRef-> Widget
-        playlistWidget playlist pageRef = do
+        playlistWidget :: PlaylistSimplified -> PageRef-> Set PlaylistId -> Widget
+        playlistWidget playlist pageRef selectedPlaylists = do
                 [whamlet|
                     $with owner <- plasimOwner playlist
                         <li>
@@ -84,9 +85,24 @@ getPlaylistsR = do
                                     <li>
                                         <img src=#{imaUrl image}>
                                 <li> owner: #{fromMaybe (usepubId owner) (usepubDisplayName owner)}
-                            ^{selectionButton SelectionAddR "Add to Selection"}
-                            ^{selectionButton SelectionRemoveR "Remove from Selection"}
+                            $if isSelected
+                                ^{selectionButton SelectionRemoveR "Remove from Selection"}
+                            $else
+                                ^{selectionButton SelectionAddR "Add to Selection"}
                 |]
             where
+                isSelected :: Bool
+                isSelected = plasimId playlist `member` selectedPlaylists
+
                 selectionButton :: Route App -> Text -> WidgetFor App ()
                 selectionButton route text = postButton route (selectionRequestParams $ SelectionParams (plasimId playlist) pageRef) text
+
+
+getSelectedPlaylists :: Handler (Set PlaylistId)
+getSelectedPlaylists = do
+    userId <- requireAuthId
+    runDB $
+        runConduit $
+            selectSource [Filter PlaylistSelectionUser (Left userId) Eq] []
+            .| mapC (PlaylistId . playlistSelectionPlaylist . entityVal)
+            .| foldMapC singleton
