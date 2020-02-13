@@ -36,12 +36,9 @@ instance PlaylistMonad MyMonad where
         result <- SpotifyClient.createPlaylist playlistName
         return $ SpotifyClient.cprId result
 
-    playlistTracksSource = SpotifyClient.playlistTracksSource spotifyPagingParams
+    playlistTracksSource = SpotifyClient.playlistTracksSource SpotifyPagingParams { sppLimit = 100 }
 
     playlistTracksSink = SpotifyClient.playlistTracksSink
-
-spotifyPagingParams :: SpotifyPagingParams
-spotifyPagingParams = SpotifyPagingParams { sppLimit = 5 }
 
 instance ShuffleMonad MyMonad where
     shuffle xs = do

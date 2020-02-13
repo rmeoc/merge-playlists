@@ -148,7 +148,7 @@ getPlaylistPage filterPredicate pageRef = runConduit $ do
 
         pagingParams = 
             S.SpotifyPagingParams
-                { S.sppLimit = 5
+                { S.sppLimit = 50
                 }
 
 playlistsSource :: (MonadIO m, MonadReader S.SpotifyClientContext m) => (S.PlaylistSimplified -> Bool) -> Direction -> Int -> S.SpotifyPagingParams -> ConduitT () (Vector (Int, S.PlaylistSimplified)) m ()
