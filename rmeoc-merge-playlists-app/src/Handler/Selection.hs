@@ -29,4 +29,4 @@ selectionHandler action = do
     SelectionParams { selectionParamsPlaylistId, selectionParamsReturnToPage } <- parsePostParams selectionRequestParamsSpec
     userId <- requireAuthId
     runDB $ action userId selectionParamsPlaylistId
-    redirect (PlaylistsR, playlistPageRequestParams selectionParamsReturnToPage)
+    redirect (PlaylistsR, runRequestParamSerializer playlistPageRequestParams selectionParamsReturnToPage)

@@ -44,6 +44,7 @@ dependencies:
 - foreign-store
 - attoparsec
 - clientsession
+- contravariant
 - either
 - free
 - hoauth2

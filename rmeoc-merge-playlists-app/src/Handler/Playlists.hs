@@ -48,18 +48,18 @@ getPlaylistsR = do
             [whamlet|
                 <h1>Playlists
                 <p>
-                    <a href=@?{(PlaylistsR, playlistPageRequestParams $ PlaylistPageParams pageRef (not onlySelected))}>
+                    <a href=@?{(PlaylistsR, runRequestParamSerializer playlistPageRequestParams $ PlaylistPageParams pageRef (not onlySelected))}>
                         $if onlySelected
                             Display All
                         $else
                             Only Display Selected
                 $maybe prev <- mprev
                     <p>
-                        <a href=@?{(PlaylistsR, playlistPageRequestParams $ PlaylistPageParams prev onlySelected)}>
+                        <a href=@?{(PlaylistsR, runRequestParamSerializer playlistPageRequestParams $ PlaylistPageParams prev onlySelected)}>
                             Previous Page
                 $maybe next <- mnext
                     <p>
-                        <a href=@?{(PlaylistsR, playlistPageRequestParams $ PlaylistPageParams next onlySelected)}>
+                        <a href=@?{(PlaylistsR, runRequestParamSerializer playlistPageRequestParams $ PlaylistPageParams next onlySelected)}>
                             Next Page
                 <ul>
                     $forall playlist <- playlists
@@ -108,7 +108,7 @@ getPlaylistsR = do
                 isSelected = plasimId playlist `member` selectedPlaylists
 
                 selectionButton :: Route App -> Text -> WidgetFor App ()
-                selectionButton route text = postButton route (selectionRequestParams $ SelectionParams (plasimId playlist) playlistPageParams) text
+                selectionButton route text = postButton route (runRequestParamSerializer selectionRequestParams $ SelectionParams (plasimId playlist) playlistPageParams) text
 
 
 getSelectedPlaylists :: Handler (Set PlaylistId)

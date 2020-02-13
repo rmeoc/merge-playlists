@@ -7,7 +7,9 @@
 {-# LANGUAGE TypeFamilies               #-}
 
 module RequestParams
-    ( RequestParamsSpec
+    ( RequestParamSerializer(..)
+    , RequestParamsSpec
+    , requestParam
     , requestParamSpec
     , parseGetParams
     , parsePostParams
@@ -16,6 +18,8 @@ module RequestParams
 
 import Control.Applicative.Free
 import Control.Monad.Reader
+import Data.Functor.Contravariant
+import Data.Functor.Contravariant.Divisible
 import Data.Maybe
 import Data.Text
 import Yesod.Core
@@ -25,6 +29,23 @@ import Yesod.Form
 data RequestParamsSpecF a = PathPiece a => RequestParamsSpecF Text (Maybe a)
 
 type RequestParamsSpec a = Ap RequestParamsSpecF a
+
+newtype RequestParamSerializer a = RequestParamSerializer { runRequestParamSerializer :: a -> [(Text,Text)] }
+
+instance Contravariant RequestParamSerializer where
+  contramap f s = RequestParamSerializer (runRequestParamSerializer s . f)
+
+instance Divisible RequestParamSerializer where
+  conquer = RequestParamSerializer (const mempty)
+  divide toBC bSerializer cSerializer = RequestParamSerializer $ \a ->
+    case toBC a of
+      (b, c) ->
+        let bParams = runRequestParamSerializer bSerializer b
+            cParams = runRequestParamSerializer cSerializer c
+        in bParams <> cParams
+
+requestParam :: PathPiece a => Text -> RequestParamSerializer a
+requestParam name = RequestParamSerializer $ \x -> pure (name, toPathPiece x)
 
 requestParamSpec :: PathPiece a => Text -> Maybe a -> RequestParamsSpec a
 requestParamSpec name mdef = liftAp $ RequestParamsSpecF name mdef
