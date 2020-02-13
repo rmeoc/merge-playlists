@@ -14,5 +14,6 @@
 /playlists                  PlaylistsR              GET
 /selection/add              SelectionAddR           POST
 /selection/remove           SelectionRemoveR        POST
+/merge                      MergeR                  GET POST
 
 /profile                    ProfileR                GET

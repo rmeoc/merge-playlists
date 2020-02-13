@@ -14,28 +14,24 @@ import Data.Maybe
 import Data.Ord
 import Data.Text hiding (singleton)
 import Network.Wreq.Session
-import OAuth2Client
 import SpotifyClient hiding (Direction)
 import SpotifyClient.Types
 import Yesod.Core
 
 import Handler.Shared
 import Import
+import Queries
 import RequestParams
+import SpotifyUtils
 
-
-runSpotify :: (MonadHandler m, MonadUnliftIO m, HandlerSite m ~ App) => ReaderT SpotifyClientContext m b -> ReaderT Session m b
-runSpotify mx = do
-    y <- getYesod
-    token <- getAccessToken (appSpotifyClientContext y)
-    withReaderT (flip SpotifyClientContext token) mx
 
 getPlaylistsR :: Handler Html
 getPlaylistsR = do
         playlistPageParams <- parseGetParams playlistPageRequestParamsSpec
 
         let onlySelected = playlistPageParamsOnlySelected playlistPageParams
-        selectedPlaylists <- getSelectedPlaylists
+        userId <- requireAuthId
+        selectedPlaylists <- runDB $ selectedPlaylistsQuery userId
         let filterPredicate = case onlySelected of
                 False -> const True
                 True -> \playlist -> plasimId playlist `member` selectedPlaylists
@@ -97,7 +93,8 @@ getPlaylistsR = do
                                 $maybe image <- chooseImage playlist
                                     <li>
                                         <img src=#{imaUrl image}>
-                                <li> owner: #{fromMaybe (usepubId owner) (usepubDisplayName owner)}
+                                <li>owner: #{fromMaybe (usepubId owner) (usepubDisplayName owner)}
+                                <li>number of tracks: #{tracksTotal $ plasimTracks playlist}
                             $if isSelected
                                 ^{selectionButton SelectionRemoveR "Remove from Selection"}
                             $else
@@ -109,13 +106,3 @@ getPlaylistsR = do
 
                 selectionButton :: Route App -> Text -> WidgetFor App ()
                 selectionButton route text = postButton route (runRequestParamSerializer selectionRequestParams $ SelectionParams (plasimId playlist) playlistPageParams) text
-
-
-getSelectedPlaylists :: Handler (Set PlaylistId)
-getSelectedPlaylists = do
-    userId <- requireAuthId
-    runDB $
-        runConduit $
-            selectSource [Filter PlaylistSelectionUser (Left userId) Eq] []
-            .| mapC (PlaylistId . playlistSelectionPlaylist . entityVal)
-            .| foldMapC singleton

@@ -20,44 +20,38 @@ module Application
     , db
     ) where
 
-import Control.Monad.Logger                 (liftLoc, runLoggingT)
-import Database.Persist.Postgresql          (createPostgresqlPool, pgConnStr,
-                                             pgPoolSize, runSqlPool)
+import Control.Monad.Logger
+import Database.Persist.Postgresql
 import Import
-import Language.Haskell.TH.Syntax           (qLocation)
-import Network.HTTP.Client.TLS              (getGlobalManager)
-import Network.Wai (Middleware)
-import Network.Wai.Handler.Warp             (Settings, defaultSettings,
-                                             defaultShouldDisplayException,
-                                             runSettings, setHost,
-                                             setOnException, setPort, getPort)
-import Network.Wai.Middleware.RequestLogger (Destination (Logger),
-                                             IPAddrSource (..),
-                                             OutputFormat (..), destination,
-                                             mkRequestLogger, outputFormat)
-import OAuth2Client                         (initOAuth2ClientContext)
-import System.Log.FastLogger                (defaultBufSize, newStdoutLoggerSet,
-                                             toLogStr)
+import Language.Haskell.TH.Syntax
+import Network.HTTP.Client.TLS
+import Network.Wai
+import Network.Wai.Handler.Warp
+import Network.Wai.Middleware.RequestLogger
+import OAuth2Client hiding (SessionKey)
+import System.Log.FastLogger
+import System.Random.Mersenne.Pure64
 
-import qualified OAuth2Client as OA
+import qualified OAuth2Client
 
 
 -- Import all relevant handler modules here.
 -- Don't forget to add new modules to your cabal file!
 import Handler.Common
 import Handler.Home
+import Handler.Merge
 import Handler.Profile
 import Handler.Playlists
 import Handler.Selection
 import Handler.SpotifyCallback
 
-data SessionKey = SessionKeySpotifyClient OA.SessionKey
+data SessionKey = SessionKeySpotifyClient OAuth2Client.SessionKey
 
 translateSessionKey :: SessionKey -> Text
 translateSessionKey (SessionKeySpotifyClient key) = case key of
-    OA.SessionKeyAccessTokenInfo -> "spfyAccToken"
-    OA.SessionKeyRefreshToken -> "spfyRfrToken"
-    OA.SessionKeyState -> "spfyState"
+    OAuth2Client.SessionKeyAccessTokenInfo -> "spfyAccToken"
+    OAuth2Client.SessionKeyRefreshToken -> "spfyRfrToken"
+    OAuth2Client.SessionKeyState -> "spfyState"
 
 -- This line actually creates our YesodDispatch instance. It is the second half
 -- of the call to mkYesodData which occurs in Foundation.hs. Please see the
@@ -84,6 +78,8 @@ makeFoundation appSettings = do
             (translateSessionKey . SessionKeySpotifyClient)
             (appSpotifyClientConf appSettings)
             appHttpManager
+
+    appRandomGeneratorState <- atomically . newTVar =<< newPureMT
 
     -- We need a log function to create a connection pool. We need a connection
     -- pool to create our foundation. And we need our foundation to get a

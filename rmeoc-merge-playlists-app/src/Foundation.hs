@@ -10,12 +10,14 @@
 
 module Foundation where
 
+import Control.Concurrent.STM
+import Control.Monad.Logger
+import Database.Persist.Sql
 import Import.NoFoundation
-import Database.Persist.Sql (ConnectionPool, runSqlPool)
-import OAuth2Client         (OAuth2ClientContext, redirectToAuthorizationPage)
-import Text.Hamlet          (hamletFile)
-import Text.Jasmine         (minifym)
-import Control.Monad.Logger (LogSource)
+import OAuth2Client
+import System.Random.Mersenne.Pure64
+import Text.Hamlet
+import Text.Jasmine
 
 -- Used only when in "auth-dummy-login" setting is enabled.
 import Yesod.Auth.Dummy
@@ -43,6 +45,7 @@ data App = App
     , appHttpManager :: Manager
     , appLogger      :: Logger
     , appSpotifyClientContext :: OAuth2ClientContext
+    , appRandomGeneratorState :: TVar (PureMT)
     }
 
 data MenuItem = MenuItem
@@ -137,6 +140,11 @@ instance Yesod App where
                     , menuItemRoute = PlaylistsR
                     , menuItemAccessCallback = isJust muser
                     }
+                , NavbarLeft $ MenuItem
+                    { menuItemLabel = "Merge"
+                    , menuItemRoute = MergeR
+                    , menuItemAccessCallback = isJust muser
+                    }
                 , NavbarRight $ MenuItem
                     { menuItemLabel = "Login"
                     , menuItemRoute = AuthR LoginR
@@ -191,6 +199,7 @@ instance Yesod App where
     isAuthorized SelectionAddR _ = isAuthenticated
     isAuthorized SelectionRemoveR _ = isAuthenticated
     isAuthorized SpotifyCallbackLoginR _ = isAuthenticated
+    isAuthorized MergeR _ = isAuthenticated
 
     -- This function creates static content files in the static folder
     -- and names them based on a hash of their content. This allows

@@ -84,7 +84,7 @@ asJSON' = liftIO . W.asJSON
 
 getPlaylistTracks :: (MonadUnliftIO m, MonadReader S.SpotifyClientContext m) => PlaylistId -> m (Vector Text)
 getPlaylistTracks playlistId = do
-    let pipeline = playlistTracksSource playlistId pagingParams .| foldMapC VB.vector
+    let pipeline = playlistTracksSource pagingParams playlistId .| foldMapC VB.vector
     builder <- runConduit pipeline
     return $ VB.build builder
   where
@@ -167,8 +167,8 @@ playlistsSource filterPredicate = pagedItemsSource getItemsUri parseItem
             playlist <- parseJSON (J.Object item)
             pure $ if filterPredicate playlist then Just (offset, playlist) else Nothing
 
-playlistTracksSource :: (MonadIO m, MonadReader S.SpotifyClientContext m) => PlaylistId -> S.SpotifyPagingParams -> ConduitT () (Vector Text) m ()
-playlistTracksSource playlistId = pagedItemsSource getItemsUri parseItem Forward 0
+playlistTracksSource :: (MonadIO m, MonadReader S.SpotifyClientContext m) => S.SpotifyPagingParams -> PlaylistId -> ConduitT () (Vector Text) m ()
+playlistTracksSource pagingParams playlistId = pagedItemsSource getItemsUri parseItem Forward 0 pagingParams
     where
         getItemsUri :: Int -> Int -> URIRef Absolute
         getItemsUri offset limit =
@@ -299,7 +299,7 @@ clonePlaylist params = do
 
     cpr <- createPlaylist (cppName params)
 
-    let source = playlistTracksSource (cppSourcePlayListId params) pagingParams
+    let source = playlistTracksSource pagingParams (cppSourcePlayListId params)
     let sink = playlistTracksSink (cprId cpr)
     let pipeline = source .| sink
 

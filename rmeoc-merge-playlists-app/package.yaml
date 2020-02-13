@@ -50,9 +50,14 @@ dependencies:
 - hoauth2
 - jose
 - lens
+- mersenne-random-pure64
 - mtl
+- random-fu
 - rmeoc-oauth2-client
+- rmeoc-playlist-tools
 - rmeoc-spotify-client
+- stateref
+- stm
 - unliftio
 - uri-bytestring
 - wreq
