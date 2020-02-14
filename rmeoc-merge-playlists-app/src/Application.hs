@@ -27,6 +27,7 @@ import Language.Haskell.TH.Syntax
 import Network.HTTP.Client.TLS
 import Network.Wai
 import Network.Wai.Handler.Warp
+import Network.Wai.Handler.WarpTLS
 import Network.Wai.Middleware.RequestLogger
 import OAuth2Client hiding (SessionKey)
 import System.Log.FastLogger
@@ -176,7 +177,7 @@ appMain = do
     app <- makeApplication foundation
 
     -- Run the application with Warp
-    runSettings (warpSettings foundation) app
+    runTLS (appTlsSettings settings) (warpSettings foundation) app
 
 
 --------------------------------------------------------------

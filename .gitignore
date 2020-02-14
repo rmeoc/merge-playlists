@@ -1,4 +1,6 @@
 auth0-client-secret.txt
 spotify-client-secret.txt
 client-session.aes
+tls-certificate.pem
+tls-key.pem
 .stack-work/

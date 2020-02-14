@@ -19,6 +19,7 @@ import           Data.Yaml                   (decodeEither')
 import           Database.Persist.Postgresql (PostgresConf)
 import           Language.Haskell.TH.Syntax  (Exp, Name, Q)
 import           Network.Wai.Handler.Warp    (HostPreference)
+import           Network.Wai.Handler.WarpTLS
 import           OAuth2Client                (OAuth2ClientConf)
 import           Yesod.Default.Config2       (applyEnvValue, configSettingsYml)
 import           Yesod.Default.Util          (WidgetFileSettings,
@@ -72,6 +73,7 @@ data AppSettings = AppSettings
     -- ^ Indicate if auth dummy login should be enabled.
 
     , appSpotifyClientConf      :: OAuth2ClientConf
+    , appTlsSettings            :: TLSSettings
     }
 
 instance FromJSON AppSettings where
@@ -106,6 +108,13 @@ instance FromJSON AppSettings where
         appAuthDummyLogin         <- o .:? "auth-dummy-login"      .!= dev
         
         appSpotifyClientConf      <- o .: "spotify-client"
+
+        appTlsSettings <- do 
+            tls <- o .: "tls"
+            tlsSettingsChain
+                <$> tls .: "certificate-file"
+                <*> tls .:? "chain-certificate-files" .!= []
+                <*> tls .: "key-file"
 
         return AppSettings {..}
 

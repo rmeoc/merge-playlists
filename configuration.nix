@@ -5,6 +5,9 @@ let
   myWebAppConfigFile = pkgs.writeText "rmeoc-merge-playlists-app-config" ''
     client-session-key-path: "/run/keys/client-session"
     generated-dir: "${stateDir}"
+    tls:
+      certificate-file: "${./tls-certificate.pem}"
+      key-file:         "/run/keys/tls-key"
     auth0:
       client-id:   ???
       domain:      ???
