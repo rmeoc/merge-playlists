@@ -15,5 +15,10 @@
       deployment.keys.auth0-client-secret.user = "mywebsrv";
       deployment.keys.auth0-client-secret.group = "mywebsrv";
       deployment.keys.auth0-client-secret.permissions = "0400";
+
+      deployment.keys.spotify-client-secret.keyFile = ./spotify-client-secret.txt;
+      deployment.keys.spotify-client-secret.user = "mywebsrv";
+      deployment.keys.spotify-client-secret.group = "mywebsrv";
+      deployment.keys.spotify-client-secret.permissions = "0400";
     };
 }

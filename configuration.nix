@@ -8,6 +8,8 @@ let
     auth0:
       client-id:   ???
       domain:      ???
+    spotify-client:
+      client-id:   ???
   '';
 in
 {
@@ -60,6 +62,7 @@ in
     wantedBy = [ "multi-user.target" ];
     script = ''
       export YESOD_AUTH0_CLIENT_SECRET=$(cat /run/keys/auth0-client-secret)
+      export MERGE_PLAYLISTS_SPOTIFY_CLIENT_SECRET=$(cat /run/keys/spotify-client-secret)
       ${pkgs.haskellPackages.rmeoc-merge-playlists-app}/bin/rmeoc-merge-playlists-app-launcher ${myWebAppConfigFile}
     '';
     serviceConfig =
