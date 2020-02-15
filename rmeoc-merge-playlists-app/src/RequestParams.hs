@@ -7,28 +7,29 @@
 {-# LANGUAGE TypeFamilies               #-}
 
 module RequestParams
-    ( RequestParamSerializer(..)
-    , RequestParamsSpec
+    ( RequestParamsSpec
     , requestParam
-    , requestParamSpec
     , parseGetParams
     , parsePostParams
     , postButton
+    , toRequestParams
     ) where
 
 import Control.Applicative.Free
+import Control.Invertible.Monoidal
 import Control.Monad.Reader
 import Data.Functor.Contravariant
 import Data.Functor.Contravariant.Divisible
+import qualified Data.Invertible as Inv
 import Data.Maybe
 import Data.Text
 import Yesod.Core
 import Yesod.Form
 
 
-data RequestParamsSpecF a = PathPiece a => RequestParamsSpecF Text (Maybe a)
+data RequestParamsParserF a = PathPiece a => RequestParamsParserF Text (Maybe a)
 
-type RequestParamsSpec a = Ap RequestParamsSpecF a
+type RequestParamsParser a = Ap RequestParamsParserF a
 
 newtype RequestParamSerializer a = RequestParamSerializer { runRequestParamSerializer :: a -> [(Text,Text)] }
 
@@ -44,21 +45,31 @@ instance Divisible RequestParamSerializer where
             cParams = runRequestParamSerializer cSerializer c
         in bParams <> cParams
 
-requestParam :: PathPiece a => Text -> RequestParamSerializer a
-requestParam name = RequestParamSerializer $ \x -> pure (name, toPathPiece x)
+data RequestParamsSpec a = RequestParamsSpec { rpsSerializer :: RequestParamSerializer a, rpsParser :: RequestParamsParser a }
 
-requestParamSpec :: PathPiece a => Text -> Maybe a -> RequestParamsSpec a
-requestParamSpec name mdef = liftAp $ RequestParamsSpecF name mdef
+instance Inv.Functor RequestParamsSpec where
+    fmap f (RequestParamsSpec serializer parser) = RequestParamsSpec ((biFrom f) `contramap` serializer) (biTo f <$> parser)
+
+instance Monoidal RequestParamsSpec where
+    unit = RequestParamsSpec conquer (pure ())
+    (>*<) (RequestParamsSpec serializer1 parser1) (RequestParamsSpec serializer2 parser2)
+        = RequestParamsSpec (divided serializer1 serializer2) ((,) <$> parser1 <*> parser2)
+
+requestParam :: PathPiece a => Text -> Maybe a -> RequestParamsSpec a
+requestParam name mdef =
+    RequestParamsSpec
+        (RequestParamSerializer $ \x -> pure (name, toPathPiece x))
+        (liftAp $ RequestParamsParserF name mdef)
 
 parseGetParams :: (MonadHandler m, RenderMessage (HandlerSite m) FormMessage) => RequestParamsSpec a -> m a 
-parseGetParams = runInputGet . runAp interpret
+parseGetParams = runInputGet . runAp interpret . rpsParser
     where
-        interpret :: (Monad m, RenderMessage (HandlerSite m) FormMessage) => RequestParamsSpecF a -> FormInput m a
-        interpret (RequestParamsSpecF name (Just def)) = fromMaybe def <$> iopt hiddenField name
-        interpret (RequestParamsSpecF name Nothing) = ireq hiddenField name
+        interpret :: (Monad m, RenderMessage (HandlerSite m) FormMessage) => RequestParamsParserF a -> FormInput m a
+        interpret (RequestParamsParserF name (Just def)) = fromMaybe def <$> iopt hiddenField name
+        interpret (RequestParamsParserF name Nothing) = ireq hiddenField name
 
 parsePostParams :: (MonadHandler m, HandlerSite m ~ site, RenderMessage site FormMessage) => RequestParamsSpec a -> m a
-parsePostParams = extractResult <=< runFormPost . const . aFormToForm . runAp interpret
+parsePostParams = extractResult <=< runFormPost . const . aFormToForm . runAp interpret . rpsParser
     where
         extractResult :: (MonadHandler m) => ((FormResult a, b), c) -> m a
         extractResult ((formResult, _), _) =
@@ -67,9 +78,12 @@ parsePostParams = extractResult <=< runFormPost . const . aFormToForm . runAp in
                 FormFailure messages -> invalidArgs messages
                 FormSuccess x -> pure x
 
-        interpret :: (MonadHandler m, RenderMessage (HandlerSite m) FormMessage) => RequestParamsSpecF a -> AForm m a
-        interpret (RequestParamsSpecF name (Just def)) = fromMaybe def <$> aopt hiddenField ("" { fsName = Just name }) Nothing
-        interpret (RequestParamsSpecF name Nothing) = areq hiddenField ("" { fsName = Just name }) Nothing
+        interpret :: (MonadHandler m, RenderMessage (HandlerSite m) FormMessage) => RequestParamsParserF a -> AForm m a
+        interpret (RequestParamsParserF name (Just def)) = fromMaybe def <$> aopt hiddenField ("" { fsName = Just name }) Nothing
+        interpret (RequestParamsParserF name Nothing) = areq hiddenField ("" { fsName = Just name }) Nothing
+
+toRequestParams :: RequestParamsSpec a -> a -> [(Text,Text)]
+toRequestParams = runRequestParamSerializer . rpsSerializer
 
 postButton :: (RenderMessage site FormMessage) => Route site -> [(Text,Text)] -> Text -> WidgetFor site ()
 postButton route params text = do
