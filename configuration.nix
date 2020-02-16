@@ -8,6 +8,11 @@ let
     tls:
       certificate-file: "${./tls-certificate.pem}"
       key-file:         "/run/keys/tls-key"
+    database:
+      user:     ""
+      password: ""
+      host:     ""
+      port:     0
     auth0:
       client-id:   ???
       domain:      ???
@@ -48,13 +53,11 @@ in
     enable = true;
     package = pkgs.postgresql_11;
     authentication = pkgs.lib.mkOverride 10 ''
-      local all postgres         ident
-      local all all              md5
-      host  all all      ::1/128 md5
+      local all all         peer
     '';
     initialScript = pkgs.writeText "backend-initScript" ''
-      CREATE USER "rmeoc-merge-playlists-app" WITH PASSWORD 'rmeoc-merge-playlists-app';
-      CREATE DATABASE "rmeoc-merge-playlists-app" WITH OWNER "rmeoc-merge-playlists-app";
+      CREATE USER "mywebsrv";
+      CREATE DATABASE "rmeoc-merge-playlists-app" WITH OWNER "mywebsrv";
     '';
   };
 
