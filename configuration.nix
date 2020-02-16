@@ -53,12 +53,19 @@ in
     enable = true;
     package = pkgs.postgresql_11;
     authentication = pkgs.lib.mkOverride 10 ''
-      local all all         peer
+      local all all peer
     '';
-    initialScript = pkgs.writeText "backend-initScript" ''
-      CREATE USER "mywebsrv";
-      CREATE DATABASE "rmeoc-merge-playlists-app" WITH OWNER "mywebsrv";
-    '';
+    ensureDatabases = [
+      "rmeoc-merge-playlists-app"
+    ];
+    ensureUsers = [
+      {
+        name = "mywebsrv";
+        ensurePermissions = {
+          "DATABASE \"rmeoc-merge-playlists-app\"" = "ALL PRIVILEGES";
+        };
+      }
+    ];
   };
 
   systemd.services.rmeoc-merge-playlists-app =
