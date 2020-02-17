@@ -61,7 +61,6 @@ dependencies:
 - stm
 - unliftio
 - uri-bytestring
-- warp-tls
 - wreq
 - yesod-auth-oauth2
 

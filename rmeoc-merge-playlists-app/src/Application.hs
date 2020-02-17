@@ -26,8 +26,8 @@ import Import
 import Language.Haskell.TH.Syntax
 import Network.HTTP.Client.TLS
 import Network.Wai
+import Network.Wai.Handler.SCGI
 import Network.Wai.Handler.Warp
-import Network.Wai.Handler.WarpTLS
 import Network.Wai.Middleware.RequestLogger
 import OAuth2Client hiding (SessionKey)
 import System.Log.FastLogger
@@ -176,9 +176,7 @@ appMain = do
     -- Generate a WAI Application from the foundation
     app <- makeApplication foundation
 
-    -- Run the application with Warp
-    runTLS (appTlsSettings settings) (warpSettings foundation) app
-
+    Network.Wai.Handler.SCGI.run app
 
 --------------------------------------------------------------
 -- Functions for DevelMain.hs (a way to run the app from GHCi)

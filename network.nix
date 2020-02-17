@@ -22,8 +22,8 @@
       deployment.keys.spotify-client-secret.permissions = "0400";
       
       deployment.keys.tls-key.keyFile = ./tls-key.pem;
-      deployment.keys.tls-key.user = "mywebsrv";
-      deployment.keys.tls-key.group = "mywebsrv";
+      deployment.keys.tls-key.user = "nginx";
+      deployment.keys.tls-key.group = "nginx";
       deployment.keys.tls-key.permissions = "0400";
     };
 }

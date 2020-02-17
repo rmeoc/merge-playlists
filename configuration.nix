@@ -3,11 +3,9 @@
 let
   stateDir = "/var/rmeoc-merge-playlists-app";
   myWebAppConfigFile = pkgs.writeText "rmeoc-merge-playlists-app-config" ''
+    approot:        ???
     client-session-key-path: "/run/keys/client-session"
     generated-dir: "${stateDir}"
-    tls:
-      certificate-file: "${./tls-certificate.pem}"
-      key-file:         "/run/keys/tls-key"
     database:
       user:     ""
       password: ""
@@ -19,6 +17,7 @@ let
     spotify-client:
       client-id:   ???
   '';
+  socketName = "/tmp/rmeoc-merge-playlists-app.socket";
 in
 {
   imports =
@@ -44,7 +43,7 @@ in
   }];
   networking.defaultGateway = { address = ???; interface = ???; };
   networking.nameservers = [???];
-  networking.firewall.allowedTCPPorts = [3000];
+  networking.firewall.allowedTCPPorts = [443];
 
   # Enable the OpenSSH daemon.
   services.openssh.enable = true;
@@ -68,21 +67,55 @@ in
     ];
   };
 
+  services.nginx = {
+    enable = true;
+    virtualHosts._ = {
+      forceSSL = true;
+      sslCertificate = "${./tls-certificate.pem}";
+      sslCertificateKey = "/run/keys/tls-key";
+      locations."/" = {
+        extraConfig = ''
+          scgi_pass unix:${socketName};
+          scgi_param  QUERY_STRING       $query_string;
+          scgi_param  REQUEST_METHOD     $request_method;
+          scgi_param  CONTENT_TYPE       $content_type;
+          scgi_param  CONTENT_LENGTH     $content_length;
+          scgi_param  PATH_INFO          $fastcgi_script_name;
+          scgi_param  SERVER_PROTOCOL    $server_protocol;
+          scgi_param  GATEWAY_INTERFACE  CGI/1.1;
+          scgi_param  SERVER_SOFTWARE    nginx/$nginx_version;
+          scgi_param  REMOTE_ADDR        $remote_addr;
+          scgi_param  SERVER_ADDR        $server_addr;
+          scgi_param  SERVER_PORT        $server_port;
+          scgi_param  SERVER_NAME        $server_name;
+        '';
+      };
+    };
+  };
+
+  systemd.sockets.rmeoc-merge-playlists-app =
+  { description = "rmeoc-merge-playlists-app";
+    listenStreams = [ socketName ];
+    socketConfig.Accept = false;
+    socketConfig.SocketMode = 220;
+    socketConfig.SocketUser = "nginx";
+  };
+
   systemd.services.rmeoc-merge-playlists-app =
   { description = "rmeoc-merge-playlists-app";
     wants = [ "postgresql.service" "client-session-key.service" "auth0-client-secret-key.service" ];
     after = [ "postgresql.service" "client-session-key.service" "auth0-client-secret-key.service" ];
-    wantedBy = [ "multi-user.target" ];
     script = ''
       export YESOD_AUTH0_CLIENT_SECRET=$(cat /run/keys/auth0-client-secret)
       export MERGE_PLAYLISTS_SPOTIFY_CLIENT_SECRET=$(cat /run/keys/spotify-client-secret)
       ${pkgs.haskellPackages.rmeoc-merge-playlists-app}/bin/rmeoc-merge-playlists-app-launcher ${myWebAppConfigFile}
     '';
-    serviceConfig =
-      { User = "mywebsrv";
-        Group = "mywebsrv";
-        WorkingDirectory = stateDir;
-      };
+    serviceConfig.User = "mywebsrv";
+    serviceConfig.Group = "mywebsrv";
+    serviceConfig.WorkingDirectory = stateDir;
+    serviceConfig.StandardInput="socket";
+    serviceConfig.StandardOutput="journal";
+    serviceConfig.StandardError="journal";
   };
 
   users.users = {
