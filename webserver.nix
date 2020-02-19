@@ -66,11 +66,6 @@ in
     deployment.keys.tls-key.group = "nginx";
     deployment.keys.tls-key.permissions = "0400";
 
-    # Use the GRUB 2 boot loader.
-    boot.loader.grub.enable = true;
-    boot.loader.grub.version = 2;
-    boot.loader.grub.device = "/dev/xvda"; # or "nodev" for efi only
-
     # The global useDHCP flag is deprecated, therefore explicitly set to false here.
     # Per-interface useDHCP will be mandatory in the future, so this generated config
     # replicates the default behaviour.
