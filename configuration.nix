@@ -2,21 +2,6 @@
 
 let
   stateDir = "/var/rmeoc-merge-playlists-app";
-  myWebAppConfigFile = pkgs.writeText "rmeoc-merge-playlists-app-config" ''
-    approot:        ???
-    client-session-key-path: "/run/keys/client-session"
-    generated-dir: "${stateDir}"
-    database:
-      user:     ""
-      password: ""
-      host:     ""
-      port:     0
-    auth0:
-      client-id:   ???
-      domain:      ???
-    spotify-client:
-      client-id:   ???
-  '';
   socketName = "/tmp/rmeoc-merge-playlists-app.socket";
 in
 {
@@ -97,11 +82,28 @@ in
   { description = "rmeoc-merge-playlists-app";
     wants = [ "postgresql.service" "client-session-key.service" "auth0-client-secret-key.service" ];
     after = [ "postgresql.service" "client-session-key.service" "auth0-client-secret-key.service" ];
-    script = ''
-      export YESOD_AUTH0_CLIENT_SECRET=$(cat /run/keys/auth0-client-secret)
-      export MERGE_PLAYLISTS_SPOTIFY_CLIENT_SECRET=$(cat /run/keys/spotify-client-secret)
-      ${pkgs.haskellPackages.rmeoc-merge-playlists-app}/bin/rmeoc-merge-playlists-app-launcher ${myWebAppConfigFile}
-    '';
+    script = let
+      configFile = pkgs.writeText "rmeoc-merge-playlists-app-config" ''
+        approot:        ???
+        client-session-key-path: "/run/keys/client-session"
+        generated-dir: "${stateDir}"
+        database:
+          user:     ""
+          password: ""
+          host:     ""
+          port:     0
+        auth0:
+          client-id:   ???
+          domain:      ???
+        spotify-client:
+          client-id:   ???
+      '';
+    in
+      ''
+        export YESOD_AUTH0_CLIENT_SECRET=$(cat /run/keys/auth0-client-secret)
+        export MERGE_PLAYLISTS_SPOTIFY_CLIENT_SECRET=$(cat /run/keys/spotify-client-secret)
+        ${pkgs.haskellPackages.rmeoc-merge-playlists-app}/bin/rmeoc-merge-playlists-app-launcher ${configFile}
+      '';
     serviceConfig.User = "mywebsrv";
     serviceConfig.Group = "mywebsrv";
     serviceConfig.WorkingDirectory = stateDir;
