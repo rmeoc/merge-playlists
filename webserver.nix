@@ -124,7 +124,7 @@ in
     { description = "rmeoc-merge-playlists-app";
       listenStreams = [ socketName ];
       socketConfig.Accept = false;
-      socketConfig.SocketMode = 220;
+      socketConfig.SocketMode = 200;
       socketConfig.SocketUser = "nginx";
     };
 
