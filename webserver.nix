@@ -130,8 +130,18 @@ in
 
     systemd.services.rmeoc-merge-playlists-app =
     { description = "rmeoc-merge-playlists-app";
-      wants = [ "postgresql.service" "client-session-key.service" "auth0-client-secret-key.service" ];
-      after = [ "postgresql.service" "client-session-key.service" "auth0-client-secret-key.service" ];
+      wants = [
+        "postgresql.service"
+        "client-session-key.service"
+        "auth0-client-secret-key.service"
+        "spotify-client-secret-key.service"
+      ];
+      after = [
+        "postgresql.service"
+        "client-session-key.service"
+        "auth0-client-secret-key.service"
+        "spotify-client-secret-key.service"
+      ];
       script = let
         configFile = pkgs.writeText "rmeoc-merge-playlists-app-config" ''
           approot:        "${config.rmeoc.mergePlaylistsApp.appRoot}"
