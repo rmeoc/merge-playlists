@@ -2,7 +2,7 @@
   webserver =
     { config, pkgs, ... }:
     { 
-      imports = [ ./configuration.nix ];
+      imports = [ ./webserver.nix ];
 
       deployment.keys.client-session.keyFile = ./client-session.aes;
       deployment.keys.client-session.user = "mywebsrv";
