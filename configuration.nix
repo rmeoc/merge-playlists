@@ -21,7 +21,7 @@ let
 in
 {
   imports =
-    [ 
+    [
     ];
 
   nixpkgs.overlays = [ (import ./overlays/overlay.nix) ];
@@ -34,14 +34,7 @@ in
   # The global useDHCP flag is deprecated, therefore explicitly set to false here.
   # Per-interface useDHCP will be mandatory in the future, so this generated config
   # replicates the default behaviour.
-  networking.useDHCP = ???;
-  networking.interfaces.eth0.useDHCP = ???;
-  networking.interfaces.eth0.ipv4.addresses = [{
-    address = ???;
-    prefixLength = ???;
-  }];
-  networking.defaultGateway = { address = ???; interface = ???; };
-  networking.nameservers = [???];
+  networking.useDHCP = false;
   networking.firewall.allowedTCPPorts = [443];
 
   # Enable the OpenSSH daemon.
