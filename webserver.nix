@@ -11,29 +11,37 @@ in
 
   options = {
 
-    rmeoc.mergePlaylistsApp = {
+    rmeoc = {
 
-      appRoot = lib.mkOption {
-        type = lib.types.str;
-        description = "Controls the base of generated URLs.";
+      httpsCertificate = lib.mkOption {
+        type = lib.types.path;
+        description = "HTTPS certificate";
       };
 
-      auth0 = {
+      mergePlaylistsApp = {
 
-        clientId = lib.mkOption {
+        appRoot = lib.mkOption {
           type = lib.types.str;
-          description = "Client ID to use when authenticating with Auth0 server";
+          description = "Controls the base of generated URLs.";
         };
 
-        domain = lib.mkOption {
-          type = lib.types.str;
-          description = "Domain for accessing the Auth0 API";
-        };
-      };
+        auth0 = {
 
-      spotifyClient.clientId = lib.mkOption {
-        type = lib.types.str;
-        description = "Client ID to use when authenticating with Spotify server";
+          clientId = lib.mkOption {
+            type = lib.types.str;
+            description = "Client ID to use when authenticating with Auth0 server";
+          };
+
+          domain = lib.mkOption {
+            type = lib.types.str;
+            description = "Domain for accessing the Auth0 API";
+          };
+        };
+
+        spotifyClient.clientId = lib.mkOption {
+          type = lib.types.str;
+          description = "Client ID to use when authenticating with Spotify server";
+        };
       };
     };
   };
@@ -95,7 +103,7 @@ in
       enable = true;
       virtualHosts._ = {
         forceSSL = true;
-        sslCertificate = "${./tls-certificate.pem}";
+        sslCertificate = config.rmeoc.httpsCertificate;
         sslCertificateKey = "/run/keys/tls-key";
         locations."/" = {
           extraConfig = ''
