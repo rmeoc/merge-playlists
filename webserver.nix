@@ -66,15 +66,6 @@ in
     deployment.keys.tls-key.group = "nginx";
     deployment.keys.tls-key.permissions = "0400";
 
-    # The global useDHCP flag is deprecated, therefore explicitly set to false here.
-    # Per-interface useDHCP will be mandatory in the future, so this generated config
-    # replicates the default behaviour.
-    networking.useDHCP = false;
-    networking.firewall.allowedTCPPorts = [443];
-
-    # Enable the OpenSSH daemon.
-    services.openssh.enable = true;
-
     services.postgresql = {
       enable = true;
       package = pkgs.postgresql_11;
@@ -124,7 +115,7 @@ in
     { description = "rmeoc-merge-playlists-app";
       listenStreams = [ socketName ];
       socketConfig.Accept = false;
-      socketConfig.SocketMode = 200;
+      socketConfig.SocketMode = "0200";
       socketConfig.SocketUser = "nginx";
     };
 
@@ -185,12 +176,6 @@ in
     };
 
     users.groups.mywebsrv = {};
-
-    # This value determines the NixOS release with which your system is to be
-    # compatible, in order to avoid breaking some software such as database
-    # servers. You should change this only after NixOS release notes say you
-    # should.
-    system.stateVersion = "19.09"; # Did you read the comment?
   };
 }
 
