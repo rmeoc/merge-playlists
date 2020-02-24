@@ -13,9 +13,9 @@ in
 
     rmeoc = {
 
-      httpsCertificate = lib.mkOption {
-        type = lib.types.path;
-        description = "HTTPS certificate";
+      domain = lib.mkOption {
+        type = lib.types.str;
+        description = "Domain name";
       };
 
       mergePlaylistsApp = {
@@ -62,10 +62,6 @@ in
     deployment.keys.spotify-client-secret.group = "mywebsrv";
     deployment.keys.spotify-client-secret.permissions = "0400";
     
-    deployment.keys.tls-key.user = "nginx";
-    deployment.keys.tls-key.group = "nginx";
-    deployment.keys.tls-key.permissions = "0400";
-
     services.postgresql = {
       enable = true;
       package = pkgs.postgresql_11;
@@ -87,10 +83,9 @@ in
 
     services.nginx = {
       enable = true;
-      virtualHosts._ = {
+      virtualHosts.${config.rmeoc.domain} = {
         forceSSL = true;
-        sslCertificate = config.rmeoc.httpsCertificate;
-        sslCertificateKey = "/run/keys/tls-key";
+        enableACME = true;
         locations."/" = {
           extraConfig = ''
             scgi_pass unix:${socketName};
@@ -111,28 +106,27 @@ in
       };
     };
 
-    systemd.sockets.rmeoc-merge-playlists-app =
-    { description = "rmeoc-merge-playlists-app";
+    systemd.sockets.rmeoc-merge-playlists-app = rec {
+      description = "rmeoc-merge-playlists-app";
+      wantedBy = [
+        "nginx.service"
+      ];
+      before = wantedBy;
       listenStreams = [ socketName ];
       socketConfig.Accept = false;
       socketConfig.SocketMode = "0200";
       socketConfig.SocketUser = "nginx";
     };
 
-    systemd.services.rmeoc-merge-playlists-app =
-    { description = "rmeoc-merge-playlists-app";
+    systemd.services.rmeoc-merge-playlists-app = rec {
+      description = "rmeoc-merge-playlists-app";
       wants = [
         "postgresql.service"
         "client-session-key.service"
         "auth0-client-secret-key.service"
         "spotify-client-secret-key.service"
       ];
-      after = [
-        "postgresql.service"
-        "client-session-key.service"
-        "auth0-client-secret-key.service"
-        "spotify-client-secret-key.service"
-      ];
+      after = wants;
       script = let
         configFile = pkgs.writeText "rmeoc-merge-playlists-app-config" ''
           approot:        "${config.rmeoc.mergePlaylistsApp.appRoot}"
@@ -148,7 +142,7 @@ in
             domain:      "${config.rmeoc.mergePlaylistsApp.auth0.domain}"
           spotify-client:
             client-id:   "${config.rmeoc.mergePlaylistsApp.spotifyClient.clientId}"
-    '';
+        '';
       in
         ''
           export YESOD_AUTH0_CLIENT_SECRET=$(cat /run/keys/auth0-client-secret)
