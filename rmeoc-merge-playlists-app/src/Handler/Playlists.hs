@@ -40,7 +40,8 @@ getPlaylistsR = do
         wreqSession <- liftIO newSession
         (mprev, playlists, mnext) <- runReaderT (runSpotify $ getPlaylistPage filterPredicate pageRef) wreqSession
 
-        defaultLayout $ 
+        defaultLayout $ do
+            setTitle "Playlists"
             [whamlet|
                 <h1>Playlists
                 <p>

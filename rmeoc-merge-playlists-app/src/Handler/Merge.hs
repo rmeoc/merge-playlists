@@ -84,10 +84,11 @@ form = renderDivs $ areq textField ("Name" { fsName = Just "name" }) Nothing
 
 showForm :: Widget -> Enctype -> Handler Html
 showForm formWidget enctype = do
-    defaultLayout $ 
+    defaultLayout $ do
+        setTitle "Create Merged Playlist"
         [whamlet|
             <h1>Create Merged Playlist
             <form method=post action=@{MergeR} enctype=#{enctype}>
                 ^{formWidget}
-                <button>Save
+                <button>Create
         |]

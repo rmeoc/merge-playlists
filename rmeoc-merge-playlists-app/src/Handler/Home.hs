@@ -23,5 +23,5 @@ data FileForm = FileForm
 getHomeR :: Handler Html
 getHomeR = do
     defaultLayout $ do
-        setTitle "Welcome To Yesod!"
+        setTitle "Merge Playlists"
         $(widgetFile "homepage")
