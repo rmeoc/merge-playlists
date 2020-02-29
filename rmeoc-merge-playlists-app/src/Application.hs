@@ -41,7 +41,6 @@ import qualified OAuth2Client
 import Handler.Common
 import Handler.Home
 import Handler.Merge
-import Handler.Profile
 import Handler.Playlists
 import Handler.Selection
 import Handler.SpotifyCallback
