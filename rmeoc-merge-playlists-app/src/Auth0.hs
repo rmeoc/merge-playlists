@@ -6,6 +6,7 @@
 module Auth0
     ( Auth0Settings(..)
     , auth0Plugin
+    , auth0Url
     ) where
 
 import ClassyPrelude.Yesod
@@ -22,8 +23,8 @@ import Data.Time.Clock              (NominalDiffTime)
 import Network.OAuth.OAuth2         (idtoken)
 import URI.ByteString               (Absolute, URIRef, authorityL,  authorityHostL, hostBSL, serializeURIRef')
 import URI.ByteString.QQ            (uri)
-import Yesod.Auth                   (AuthPlugin, Creds(..), YesodAuth)
-import Yesod.Auth.OAuth2            (OAuth2(..), authOAuth2, idToken)
+import Yesod.Auth
+import Yesod.Auth.OAuth2
 
 import qualified Yesod.Auth.OAuth2.Exception as YesodOAuth2Exception
 
@@ -45,6 +46,9 @@ instance FromJSON Auth0Settings where
     
 pluginName :: Text
 pluginName = "Auth0"
+
+auth0Url :: AuthRoute
+auth0Url = oauth2Url pluginName
 
 auth0Plugin :: YesodAuth m => Auth0Settings -> AuthPlugin m
 auth0Plugin Auth0Settings {..}

@@ -30,7 +30,7 @@ import qualified Data.Text.Encoding as TE
 import qualified Data.ByteString as BS
 import qualified Web.ClientSession as CS
 
-import Auth0                (auth0Plugin)
+import Auth0
 
 
 -- | The foundation datatype for your application. This can be a good place to
@@ -290,6 +290,8 @@ instance YesodAuth App where
     onLogin = do
         y <- getYesod
         redirectToAuthorizationPage (appSpotifyClientContext y) SpotifyCallbackLoginR
+
+    loginHandler = redirect $ AuthR auth0Url
 
 -- | Access function to determine if a user is logged in.
 isAuthenticated :: Handler AuthResult
